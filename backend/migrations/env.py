@@ -10,8 +10,9 @@ from tsuki.core.logging import configure_logging
 from tsuki.db.base import Base
 from tsuki.db.session import create_database_url
 from tsuki.modules.auth.models import Admin  # noqa: F401
+from tsuki.modules.work.models import Work  # noqa: F401
 
-settings = Settings()
+settings = Settings()  # pyright: ignore[reportCallIssue]
 configure_logging(settings.log_level)
 target_metadata = Base.metadata
 
