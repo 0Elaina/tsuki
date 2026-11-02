@@ -1,0 +1,72 @@
+@layer theme, base, antd, components, utilities;
+
+@import 'tailwindcss';
+@import './theme.css';
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  /* 页面底色：极淡薰衣草 + 右上角柔光晕，构成轻微空间感。 */
+  body {
+    background-color: var(--color-canvas);
+    background-image: radial-gradient(
+      ellipse 80% 60% at 78% -10%,
+      rgb(196 181 253 / 0.32),
+      transparent 70%
+    );
+    background-attachment: fixed;
+  }
+
+  /* 尊重系统的减少动效偏好。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* 路由导航进度条：不确定进度，来回扫动。 */
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* 内容区淡入：切页时不生硬跳变。 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 光晕缓慢呼吸，避免大面积渐变色块过于静止。 */
+@keyframes glow-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, -2%, 0) scale(1.04);
+  }
+}

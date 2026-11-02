@@ -1,0 +1,54 @@
+/* 主题值由 Ant Design 生成；此处只定义业务样式使用的语义名称。 */
+@theme inline {
+  /* 主色：品牌动作与强调 */
+  --color-primary: var(--ant-color-primary);
+  --color-primary-hover: var(--ant-color-primary-hover);
+  --color-primary-active: var(--ant-color-primary-active);
+  --color-primary-subtle: var(--ant-color-primary-bg);
+  --color-primary-border: var(--ant-color-primary-border);
+
+  /* 点缀色：萌系强调，只用于指示条、圆环、光晕 */
+  --color-accent: #f472b6;
+  --color-accent-soft: #fce7f3;
+  --color-accent-strong: #db2777;
+
+  /* 文字 */
+  --color-content: var(--ant-color-text);
+  --color-content-muted: var(--ant-color-text-secondary);
+  --color-content-subtle: var(--ant-color-text-tertiary);
+
+  /* 背景 */
+  --color-canvas: var(--ant-color-bg-layout);
+  --color-surface: var(--ant-color-bg-container);
+  --color-surface-raised: var(--ant-color-bg-elevated);
+  --color-surface-glass: rgb(255 255 255 / 0.72);
+
+  /* 边框 */
+  --color-border: var(--ant-color-border);
+  --color-border-subtle: var(--ant-color-border-secondary);
+  --color-border-glass: rgb(255 255 255 / 0.6);
+
+  /* 状态 */
+  --color-success: var(--ant-color-success);
+  --color-warning: var(--ant-color-warning);
+  --color-error: var(--ant-color-error);
+
+  /* 字体 */
+  --font-sans: var(--ant-font-family);
+
+  /* 圆角：与 theme.ts 的 borderRadius 派生值对齐 */
+  --radius-control: var(--ant-border-radius);
+  --radius-card: var(--ant-border-radius-lg);
+  --radius-popover: var(--ant-border-radius-outer);
+
+  /* 阴影：多层柔和叠加，替代单层硬投影 */
+  --shadow-soft: 0 1px 3px rgb(31 27 46 / 0.04), 0 8px 24px rgb(31 27 46 / 0.06);
+  --shadow-raised: 0 2px 6px rgb(31 27 46 / 0.05), 0 12px 32px rgb(31 27 46 / 0.08);
+  --shadow-glow: 0 8px 32px rgb(124 58 237 / 0.16);
+
+  /* 动效：苹果常用的标准曲线与三档时长 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+}

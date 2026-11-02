@@ -1,0 +1,20 @@
+# Local environment
+/.env
+/.env.*
+!/.env.example
+/.venv/
+
+# Python caches and build outputs
+__pycache__/
+*.py[cod]
+*.egg-info/
+/.ruff_cache/
+/build/
+/dist/
+
+# Logs and local editor configuration
+/logs/
+*.log
+/.idea/
+/.vscode/
+/.DS_Store
