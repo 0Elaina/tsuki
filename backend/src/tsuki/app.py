@@ -6,16 +6,18 @@ from tsuki.core.config import Settings
 from tsuki.core.logging import configure_logging
 from tsuki.lifespan import lifespan
 from tsuki.modules.auth.router import router as auth_router
+from tsuki.modules.work.admin_router import admin_router as work_admin_router
 
 
 def create_app() -> CORSMiddleware:
-    settings = Settings()
+    settings = Settings()  # pyright: ignore[reportCallIssue]
     configure_logging(settings.log_level)
 
     api = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
 
     # 绑定路由
     api.include_router(auth_router)
+    api.include_router(work_admin_router)
 
     api.state.settings = settings
     register_exception_handlers(api)

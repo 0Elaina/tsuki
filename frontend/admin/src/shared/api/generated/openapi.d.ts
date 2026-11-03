@@ -64,6 +64,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Works
+         * @description 获取作品列表
+         */
+        get: operations["list_works_api_v1_admin_works_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/works/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Work
+         * @description 获取作品详情
+         */
+        get: operations["get_work_api_v1_admin_works__work_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -100,6 +140,22 @@ export interface components {
             /** Data */
             data: null;
         };
+        /** ApiResponse[Page[WorkListItem]] */
+        ApiResponse_Page_WorkListItem__: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            data: components["schemas"]["Page_WorkListItem_"] | null;
+        };
+        /** ApiResponse[WorkDetail] */
+        ApiResponse_WorkDetail_: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            data: components["schemas"]["WorkDetail"] | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -124,6 +180,27 @@ export interface components {
              */
             expires_at: string;
         };
+        /**
+         * MediaType
+         * @enum {string}
+         */
+        MediaType: "anime" | "manga" | "novel" | "game";
+        /** Page[WorkListItem] */
+        Page_WorkListItem_: {
+            /** Items */
+            items: components["schemas"]["WorkListItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /**
+         * ReleaseStatus
+         * @enum {string}
+         */
+        ReleaseStatus: "unknown" | "not_released" | "releasing" | "finished" | "hiatus" | "canceled";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -136,6 +213,66 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WorkDetail
+         * @description 作品详情
+         */
+        WorkDetail: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Original Name */
+            original_name: string | null;
+            /** Aliases */
+            aliases: string[];
+            /** Summary */
+            summary: string | null;
+            media_type: components["schemas"]["MediaType"];
+            release_status: components["schemas"]["ReleaseStatus"];
+            release_date: components["schemas"]["WorkReleaseDate"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * WorkListItem
+         * @description 作品列表项
+         */
+        WorkListItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Original Name */
+            original_name: string | null;
+            media_type: components["schemas"]["MediaType"];
+            release_status: components["schemas"]["ReleaseStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * WorkReleaseDate
+         * @description 作品发布时间
+         */
+        WorkReleaseDate: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number | null;
+            /** Day */
+            day: number | null;
         };
     };
     responses: never;
@@ -233,6 +370,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_NoneType_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_works_api_v1_admin_works_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                keyword?: string | null;
+                media_type?: components["schemas"]["MediaType"] | null;
+                release_status?: components["schemas"]["ReleaseStatus"] | null;
+            };
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_Page_WorkListItem__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_work_api_v1_admin_works__work_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path: {
+                /** @description 作品ID */
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_WorkDetail_"];
                 };
             };
             /** @description Validation Error */
