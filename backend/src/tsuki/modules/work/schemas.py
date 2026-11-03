@@ -1,7 +1,10 @@
+from typing import Self
+
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 from tsuki.api.pagination import PageQuery
 from tsuki.modules.work.enums import MediaType, ReleaseStatus
+from tsuki.modules.work.models import Work
 
 MAX_SEARCH_KEYWORD_LENGTH: int = 255
 
@@ -56,3 +59,18 @@ class WorkDetail(BaseModel):
     release_date: WorkReleaseDate | None
     created_at: AwareDatetime
     updated_at: AwareDatetime
+
+    @classmethod
+    def of(cls, work: Work, release_date: WorkReleaseDate | None) -> Self:
+        return cls(
+            id=work.id,
+            name=work.name,
+            original_name=work.original_name,
+            aliases=work.aliases,
+            summary=work.summary,
+            media_type=MediaType(work.media_type),
+            release_status=ReleaseStatus(work.release_status),
+            release_date=release_date,
+            created_at=work.created_at,
+            updated_at=work.updated_at,
+        )
