@@ -1,4 +1,4 @@
-from sqlalchemy import ColumnElement, RowMapping, func, or_, select
+from sqlalchemy import ColumnElement, RowMapping, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tsuki.api.pagination import DEFAULT_PAGE, DEFAULT_PAGE_SIZE
@@ -22,13 +22,25 @@ class WorkRepository:
 
         # 关键词过滤
         if keyword is not None:
+            alias_elem = (
+                func.unnest(Work.aliases)
+                .table_valued("value")
+                .render_derived("work_aliases")
+            )
+            alias_exist = (
+                (
+                    select(literal_column("1"))
+                    .select_from(alias_elem)
+                    .where(alias_elem.c.value.icontains(keyword, autoescape=True))
+                )
+                .correlate(Work)
+                .exists()
+            )
             conditions.append(
                 or_(
                     Work.name.icontains(keyword, autoescape=True),
                     Work.original_name.icontains(keyword, autoescape=True),
-                    func.array_to_string(Work.aliases, " ").icontains(
-                        keyword, autoescape=True
-                    ),
+                    alias_exist,
                 )
             )
 
