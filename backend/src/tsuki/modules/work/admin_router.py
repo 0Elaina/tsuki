@@ -11,6 +11,7 @@ from tsuki.modules.work.schemas import (
     WorkDetail,
     WorkListItem,
     WorkListQuery,
+    WorkUpdateRequest,
 )
 from tsuki.modules.work.service import WorkService
 
@@ -51,4 +52,16 @@ async def create_work(
     """创建作品"""
 
     detail = await work_service.create(session, body)
+    return ApiResponse.success(detail)
+
+
+@admin_router.put("/{work_id}")
+async def update_work(
+    work_id: Annotated[int, Path(ge=1, le=2**63 - 1, description="作品ID")],
+    body: WorkUpdateRequest,
+    session: DbSession,
+) -> ApiResponse[WorkDetail]:
+    """更新作品"""
+
+    detail = await work_service.update(session, work_id, body)
     return ApiResponse.success(detail)

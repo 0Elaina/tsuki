@@ -190,3 +190,65 @@
 | 403 | INVALID_CSRF_REQUEST |
 | 422 | INVALID_REQUEST |
 
+## PUT /api/v1/admin/works/{work_id}
+
+完整修改指定作品的全部资料，采用替换语义，可写字段全部必传。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明（枚举须写全映射） |
+| --- | --- | --- | --- | --- |
+| Cookie | string | header | ✅ | 包含有效 `tsuki_admin_token`，由浏览器自动携带 |
+| X-CSRF-Protection | string | header | ✅ | 固定值 `1`，非安全方法防护头 |
+| work_id | int | path | ✅ | 目标作品 ID，范围 1～9223372036854775807 |
+| name | string | body | ✅ | 作品展示名，去除首尾空白后 1～255 字符 |
+| original_name | string 或 null | body | ✅ | 原文名，最长 255 字符；清空传 null |
+| aliases | array of string | body | ✅ | 别名列表，最多 50 项，每项 1～255 字符；清空传空数组 `[]` |
+| summary | string 或 null | body | ✅ | 作品简介，最长 10000 字符；清空传 null |
+| media_type | string | body | ✅ | 媒介类型：anime=动画, manga=漫画, novel=小说, game=游戏 |
+| release_status | string | body | ✅ | 发行状态：unknown=未知, not_released=未发行, releasing=发行中, finished=已发行/完结, hiatus=暂停, canceled=取消 |
+| release_date | object 或 null | body | ✅ | 发行日期对象；日期完全未知清空传 null |
+| release_date.year | int | body | ❌ | 发行年份，严格整数 1～9999（提供日期对象时必填） |
+| release_date.month | int 或 null | body | ❌ | 发行月份，严格整数 1～12；未知填 null |
+| release_date.day | int 或 null | body | ❌ | 发行日，严格整数 1～31；填写日时必须填写月；未知填 null |
+
+**响应数据**
+
+成功状态为 HTTP 200，`data` 为更新后的作品完整详情，`updated_at` 自动刷新为最新时间。
+
+**响应示例**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "data": {
+    "id": 1,
+    "name": "命运石之门 0",
+    "original_name": "Steins;Gate 0",
+    "aliases": ["石头门0", "S;G0"],
+    "summary": "未能拯救她的世界线故事。",
+    "media_type": "anime",
+    "release_status": "finished",
+    "release_date": {
+      "year": 2018,
+      "month": 4,
+      "day": 12
+    },
+    "created_at": "2026-11-04T10:00:00Z",
+    "updated_at": "2026-11-04T11:00:00Z"
+  }
+}
+```
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 401 | AUTHENTICATION_REQUIRED |
+| 401 | INVALID_TOKEN |
+| 403 | INVALID_CSRF_REQUEST |
+| 404 | WORK_NOT_FOUND |
+| 422 | INVALID_REQUEST |
+
+

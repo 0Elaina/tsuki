@@ -12,6 +12,7 @@ from tsuki.modules.work.schemas import (
     WorkListItem,
     WorkListQuery,
     WorkReleaseDate,
+    WorkUpdateRequest,
     WorkWriteInput,
 )
 
@@ -93,6 +94,19 @@ class WorkService:
         """创建作品"""
 
         work = Work()
+        _apply_work_input(work, body)
+        saved_work = await self.repository.save(session, work)
+        return _to_work_detail(saved_work)
+
+    async def update(
+        self, session: AsyncSession, work_id: int, body: WorkUpdateRequest
+    ) -> WorkDetail:
+        """更新作品"""
+
+        work = await self.repository.get_by_id(session, work_id)
+        if work is None:
+            raise BusinessException(WorkApiCode.WORK_NOT_FOUND)
+
         _apply_work_input(work, body)
         saved_work = await self.repository.save(session, work)
         return _to_work_detail(saved_work)
