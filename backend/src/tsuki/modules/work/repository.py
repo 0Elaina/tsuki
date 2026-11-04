@@ -80,3 +80,10 @@ class WorkRepository:
         """根据 id 查询作品"""
         result = await session.execute(select(Work).where(Work.id == work_id))
         return result.scalar_one_or_none()
+
+    async def save(self, session: AsyncSession, work: Work) -> Work:
+        """保存作品"""
+
+        session.add(work)
+        await session.flush()
+        return work

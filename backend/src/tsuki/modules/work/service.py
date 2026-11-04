@@ -4,13 +4,47 @@ from tsuki.api.pagination import Page
 from tsuki.core.exceptions import BusinessException
 from tsuki.modules.work.api_code import WorkApiCode
 from tsuki.modules.work.enums import MediaType, ReleaseStatus
+from tsuki.modules.work.models import Work
 from tsuki.modules.work.repository import WorkRepository
 from tsuki.modules.work.schemas import (
+    WorkCreateRequest,
     WorkDetail,
     WorkListItem,
     WorkListQuery,
     WorkReleaseDate,
+    WorkWriteInput,
 )
+
+
+def _apply_work_input(work: Work, body: WorkWriteInput) -> None:
+    """将写入入参映射到 orm"""
+
+    work.name = body.name
+    work.original_name = body.original_name
+    work.aliases = list(body.aliases)
+    work.summary = body.summary
+    work.media_type = body.media_type.value
+    work.release_status = body.release_status.value
+
+    if body.release_date is None:
+        work.release_year = None
+        work.release_month = None
+        work.release_day = None
+    else:
+        work.release_year = body.release_date.year
+        work.release_month = body.release_date.month
+        work.release_day = body.release_date.day
+
+
+def _to_work_detail(work: Work) -> WorkDetail:
+    """将 orm 转换成作品详情响应"""
+
+    release_date: WorkReleaseDate | None = None
+    if work.release_year is not None:
+        release_date = WorkReleaseDate(
+            year=work.release_year, month=work.release_month, day=work.release_day
+        )
+    return WorkDetail.of(work=work, release_date=release_date)
 
 
 class WorkService:
@@ -51,9 +85,14 @@ class WorkService:
         work = await self.repository.get_by_id(session, work_id)
         if work is None:
             raise BusinessException(WorkApiCode.WORK_NOT_FOUND)
-        release_date: WorkReleaseDate | None = None
-        if work.release_year is not None:
-            release_date = WorkReleaseDate(
-                year=work.release_year, month=work.release_month, day=work.release_day
-            )
-        return WorkDetail.of(work=work, release_date=release_date)
+        return _to_work_detail(work)
+
+    async def create(
+        self, session: AsyncSession, body: WorkCreateRequest
+    ) -> WorkDetail:
+        """创建作品"""
+
+        work = Work()
+        _apply_work_input(work, body)
+        saved_work = await self.repository.save(session, work)
+        return _to_work_detail(saved_work)

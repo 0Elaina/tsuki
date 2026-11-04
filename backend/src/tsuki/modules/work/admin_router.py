@@ -6,7 +6,12 @@ from tsuki.api.dependencies import DbSession
 from tsuki.api.pagination import Page
 from tsuki.api.responses import ApiResponse
 from tsuki.modules.auth.dependencies import get_current_admin, require_csrf
-from tsuki.modules.work.schemas import WorkDetail, WorkListItem, WorkListQuery
+from tsuki.modules.work.schemas import (
+    WorkCreateRequest,
+    WorkDetail,
+    WorkListItem,
+    WorkListQuery,
+)
 from tsuki.modules.work.service import WorkService
 
 admin_router = APIRouter(
@@ -36,4 +41,14 @@ async def get_work(
     """获取作品详情"""
 
     detail = await work_service.get_detail(session, work_id)
+    return ApiResponse.success(detail)
+
+
+@admin_router.post("")
+async def create_work(
+    body: WorkCreateRequest, session: DbSession
+) -> ApiResponse[WorkDetail]:
+    """创建作品"""
+
+    detail = await work_service.create(session, body)
     return ApiResponse.success(detail)
