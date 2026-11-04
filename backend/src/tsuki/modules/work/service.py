@@ -130,3 +130,19 @@ class WorkService:
         deleted_ids = await self.repository.delete_by_ids(session, work_ids)
         _ensure_all_work_ids_exist(work_ids, set(deleted_ids))
         return len(deleted_ids)
+
+    async def update_status(
+        self, session: AsyncSession, work_ids: list[int], release_status: ReleaseStatus
+    ) -> int:
+        """批量修改作品状态"""
+
+        works = await self.repository.get_by_ids(session, work_ids)
+        _ensure_all_work_ids_exist(work_ids, {w.id for w in works})
+        target_status = release_status.value
+        changed_works = [w for w in works if w.release_status != target_status]
+        if not changed_works:
+            return 0
+        for work in changed_works:
+            work.release_status = target_status
+        await self.repository.batch_save(session, changed_works)
+        return len(changed_works)

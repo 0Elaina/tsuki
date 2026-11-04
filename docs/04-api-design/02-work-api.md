@@ -322,5 +322,43 @@
 | 404 | WORK_NOT_FOUND |
 | 422 | INVALID_REQUEST |
 
+## POST /api/v1/admin/works/batch-update-status
+
+批量统一修改作品发行状态，任一目标不存在则整批回滚，跳过状态相同者，返回实际更新作品数量。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明（枚举须写全映射） |
+| --- | --- | --- | --- | --- |
+| Cookie | string | header | ✅ | 包含有效 `tsuki_admin_token`，由浏览器自动携带 |
+| X-CSRF-Protection | string | header | ✅ | 固定值 `1`，非安全方法防护头 |
+| work_ids | array of integer | body | ✅ | 作品 ID 列表，1～100 项；按首次出现顺序去重 |
+| release_status | string | body | ✅ | 目标发行状态：unknown=未知, not_released=未发行, releasing=发行中, finished=已发行/完结, hiatus=暂停, canceled=取消 |
+
+**响应数据**
+
+成功状态为 HTTP 200，`data` 为状态实际改变的作品数量整数；若全部目标状态原本就等于目标状态，成功返回 0。
+
+**响应示例**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "data": 1
+}
+```
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 401 | AUTHENTICATION_REQUIRED |
+| 401 | INVALID_TOKEN |
+| 403 | INVALID_CSRF_REQUEST |
+| 404 | WORK_NOT_FOUND |
+| 422 | INVALID_REQUEST |
+
+
 
 

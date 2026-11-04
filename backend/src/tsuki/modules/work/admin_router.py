@@ -8,6 +8,7 @@ from tsuki.api.responses import ApiResponse
 from tsuki.modules.auth.dependencies import get_current_admin, require_csrf
 from tsuki.modules.work.schemas import (
     WorkBatchIdsRequest,
+    WorkBatchStatusUpdateRequest,
     WorkCreateRequest,
     WorkDetail,
     WorkListItem,
@@ -87,3 +88,15 @@ async def delete_work(
 
     await work_service.delete(session, [work_id])
     return ApiResponse.success()
+
+
+@admin_router.post("/batch-update-status")
+async def batch_update_work_status(
+    body: WorkBatchStatusUpdateRequest, session: DbSession
+) -> ApiResponse[int]:
+    """批量更新作品状态"""
+
+    result_count = await work_service.update_status(
+        session, body.work_ids, body.release_status
+    )
+    return ApiResponse.success(result_count)

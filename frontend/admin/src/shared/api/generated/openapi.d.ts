@@ -77,7 +77,11 @@ export interface paths {
          */
         get: operations["list_works_api_v1_admin_works_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Work
+         * @description 创建作品
+         */
+        post: operations["create_work_api_v1_admin_works_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -96,8 +100,56 @@ export interface paths {
          * @description 获取作品详情
          */
         get: operations["get_work_api_v1_admin_works__work_id__get"];
-        put?: never;
+        /**
+         * Update Work
+         * @description 更新作品
+         */
+        put: operations["update_work_api_v1_admin_works__work_id__put"];
         post?: never;
+        /**
+         * Delete Work
+         * @description 删除作品
+         */
+        delete: operations["delete_work_api_v1_admin_works__work_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/works/batch-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Delete Works
+         * @description 批量删除作品
+         */
+        post: operations["batch_delete_works_api_v1_admin_works_batch_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/works/batch-update-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch Update Work Status
+         * @description 批量更新作品状态
+         */
+        post: operations["batch_update_work_status_api_v1_admin_works_batch_update_status_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -155,6 +207,15 @@ export interface components {
             /** Message */
             message: string;
             data: components["schemas"]["WorkDetail"] | null;
+        };
+        /** ApiResponse[int] */
+        ApiResponse_int_: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Data */
+            data: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -215,6 +276,41 @@ export interface components {
             ctx?: Record<string, never>;
         };
         /**
+         * WorkBatchIdsRequest
+         * @description 批量操作作品 ID 列表入参
+         */
+        WorkBatchIdsRequest: {
+            /** Work Ids */
+            work_ids: number[];
+        };
+        /**
+         * WorkBatchStatusUpdateRequest
+         * @description 批量更新作品状态入参
+         */
+        WorkBatchStatusUpdateRequest: {
+            /** Work Ids */
+            work_ids: number[];
+            release_status: components["schemas"]["ReleaseStatus"];
+        };
+        /**
+         * WorkCreateRequest
+         * @description 作品创建入参
+         */
+        WorkCreateRequest: {
+            /** Name */
+            name: string;
+            /** Original Name */
+            original_name?: string | null;
+            /** Aliases */
+            aliases?: string[];
+            /** Summary */
+            summary?: string | null;
+            media_type: components["schemas"]["MediaType"];
+            /** @default unknown */
+            release_status: components["schemas"]["ReleaseStatus"];
+            release_date?: components["schemas"]["WorkReleaseDateInput"] | null;
+        };
+        /**
          * WorkDetail
          * @description 作品详情
          */
@@ -273,6 +369,35 @@ export interface components {
             month: number | null;
             /** Day */
             day: number | null;
+        };
+        /**
+         * WorkReleaseDateInput
+         * @description 发行日期入参
+         */
+        WorkReleaseDateInput: {
+            /** Year */
+            year: number;
+            /** Month */
+            month?: number | null;
+            /** Day */
+            day?: number | null;
+        };
+        /**
+         * WorkUpdateRequest
+         * @description 作品更新入参
+         */
+        WorkUpdateRequest: {
+            /** Name */
+            name: string;
+            /** Original Name */
+            original_name: string | null;
+            /** Aliases */
+            aliases: string[];
+            /** Summary */
+            summary: string | null;
+            media_type: components["schemas"]["MediaType"];
+            release_status: components["schemas"]["ReleaseStatus"];
+            release_date: components["schemas"]["WorkReleaseDateInput"] | null;
         };
     };
     responses: never;
@@ -421,6 +546,42 @@ export interface operations {
             };
         };
     };
+    create_work_api_v1_admin_works_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_WorkDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_work_api_v1_admin_works__work_id__get: {
         parameters: {
             query?: never;
@@ -443,6 +604,152 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_WorkDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_work_api_v1_admin_works__work_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path: {
+                /** @description 作品ID */
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_WorkDetail_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_work_api_v1_admin_works__work_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path: {
+                /** @description 作品ID */
+                work_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_NoneType_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_delete_works_api_v1_admin_works_batch_delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkBatchIdsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_int_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    batch_update_work_status_api_v1_admin_works_batch_update_status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 防护头, 非安全方法固定为 1 */
+                "X-CSRF-Protection"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkBatchStatusUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_int_"];
                 };
             };
             /** @description Validation Error */

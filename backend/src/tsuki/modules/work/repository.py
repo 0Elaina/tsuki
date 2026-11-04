@@ -105,3 +105,17 @@ class WorkRepository:
             delete(Work).where(Work.id.in_(work_ids)).returning(Work.id)
         )
         return list(result.scalars().all())
+
+    async def get_by_ids(
+        self, session: AsyncSession, work_ids: list[int]
+    ) -> list[Work]:
+        """根据 id 批量查询作品"""
+
+        result = await session.execute(select(Work).where(Work.id.in_(work_ids)))
+        return list(result.scalars().all())
+
+    async def batch_save(self, session: AsyncSession, works: list[Work]) -> None:
+        """批量保存作品"""
+
+        session.add_all(works)
+        await session.flush()
