@@ -30,5 +30,5 @@ async def get_redis(request: Request) -> Redis:
 
 
 AppSettings = Annotated[Settings, Depends(get_settings)]
-DbSession = Annotated[AsyncSession, Depends(get_session)]
+DbSession = Annotated[AsyncSession, Depends(get_session, scope="function")]
 RedisClient = Annotated[Redis, Depends(get_redis)]
