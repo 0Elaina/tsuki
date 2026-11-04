@@ -48,6 +48,19 @@ def _to_work_detail(work: Work) -> WorkDetail:
     return WorkDetail.of(work=work, release_date=release_date)
 
 
+def _ensure_all_work_ids_exist(
+    requested_ids: list[int], existing_ids: set[int]
+) -> None:
+    """按请求顺序核查所有目标 ID 均存在，存在缺失时抛出 404 异常并指明缺失 ID"""
+
+    missing_ids = [work_id for work_id in requested_ids if work_id not in existing_ids]
+    if missing_ids:
+        formatted_ids = "、".join(str(i) for i in missing_ids)
+        raise BusinessException(
+            WorkApiCode.WORK_NOT_FOUND, f"作品不存在, ID: {formatted_ids}"
+        )
+
+
 class WorkService:
     def __init__(self, repository: WorkRepository | None = None) -> None:
         self.repository = repository or WorkRepository()
@@ -110,3 +123,10 @@ class WorkService:
         _apply_work_input(work, body)
         saved_work = await self.repository.save(session, work)
         return _to_work_detail(saved_work)
+
+    async def delete(self, session: AsyncSession, work_ids: list[int]) -> int:
+        """删除作品"""
+
+        deleted_ids = await self.repository.delete_by_ids(session, work_ids)
+        _ensure_all_work_ids_exist(work_ids, set(deleted_ids))
+        return len(deleted_ids)

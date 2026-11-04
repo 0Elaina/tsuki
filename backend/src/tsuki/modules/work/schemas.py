@@ -190,15 +190,3 @@ class WorkBatchStatusUpdateRequest(WorkBatchIdsRequest):
     """批量更新作品状态入参"""
 
     release_status: ReleaseStatus
-
-
-class WorkBatchDeleteResult(BaseModel):
-    """批量删除作品结果"""
-
-    deleted_count: int = Field(ge=0)
-
-
-class WorkBatchStatusUpdateResult(BaseModel):
-    """批量更新作品状态结果"""
-
-    updated_count: int = Field(ge=0)

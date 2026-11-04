@@ -251,4 +251,76 @@
 | 404 | WORK_NOT_FOUND |
 | 422 | INVALID_REQUEST |
 
+## DELETE /api/v1/admin/works/{work_id}
+
+按作品 ID 永久删除指定作品。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明（枚举须写全映射） |
+| --- | --- | --- | --- | --- |
+| Cookie | string | header | ✅ | 包含有效 `tsuki_admin_token`，由浏览器自动携带 |
+| X-CSRF-Protection | string | header | ✅ | 固定值 `1`，非安全方法防护头 |
+| work_id | int | path | ✅ | 目标作品 ID，范围 1～9223372036854775807 |
+
+**响应数据**
+
+成功状态为 HTTP 200，`data` 固定为 null。
+
+**响应示例**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "data": null
+}
+```
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 401 | AUTHENTICATION_REQUIRED |
+| 401 | INVALID_TOKEN |
+| 403 | INVALID_CSRF_REQUEST |
+| 404 | WORK_NOT_FOUND |
+
+## POST /api/v1/admin/works/batch-delete
+
+根据作品 ID 列表批量永久删除作品，任一目标不存在则整批回滚，成功返回删除作品数量。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明（枚举须写全映射） |
+| --- | --- | --- | --- | --- |
+| Cookie | string | header | ✅ | 包含有效 `tsuki_admin_token`，由浏览器自动携带 |
+| X-CSRF-Protection | string | header | ✅ | 固定值 `1`，非安全方法防护头 |
+| work_ids | array of integer | body | ✅ | 作品 ID 列表，1～100 项；按首次出现顺序去重 |
+
+**响应数据**
+
+成功状态为 HTTP 200，`data` 为实际删除的作品数量整数。
+
+**响应示例**
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "data": 2
+}
+```
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 401 | AUTHENTICATION_REQUIRED |
+| 401 | INVALID_TOKEN |
+| 403 | INVALID_CSRF_REQUEST |
+| 404 | WORK_NOT_FOUND |
+| 422 | INVALID_REQUEST |
+
+
 

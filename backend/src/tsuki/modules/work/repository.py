@@ -1,4 +1,12 @@
-from sqlalchemy import ColumnElement, RowMapping, func, literal_column, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    RowMapping,
+    delete,
+    func,
+    literal_column,
+    or_,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tsuki.api.pagination import DEFAULT_PAGE, DEFAULT_PAGE_SIZE
@@ -87,3 +95,13 @@ class WorkRepository:
         session.add(work)
         await session.flush()
         return work
+
+    async def delete_by_ids(
+        self, session: AsyncSession, work_ids: list[int]
+    ) -> list[int]:
+        """根据 id 批量删除作品"""
+
+        result = await session.execute(
+            delete(Work).where(Work.id.in_(work_ids)).returning(Work.id)
+        )
+        return list(result.scalars().all())

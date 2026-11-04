@@ -7,6 +7,7 @@ from tsuki.api.pagination import Page
 from tsuki.api.responses import ApiResponse
 from tsuki.modules.auth.dependencies import get_current_admin, require_csrf
 from tsuki.modules.work.schemas import (
+    WorkBatchIdsRequest,
     WorkCreateRequest,
     WorkDetail,
     WorkListItem,
@@ -65,3 +66,24 @@ async def update_work(
 
     detail = await work_service.update(session, work_id, body)
     return ApiResponse.success(detail)
+
+
+@admin_router.post("/batch-delete")
+async def batch_delete_works(
+    body: WorkBatchIdsRequest, session: DbSession
+) -> ApiResponse[int]:
+    """批量删除作品"""
+
+    result_count = await work_service.delete(session, body.work_ids)
+    return ApiResponse.success(result_count)
+
+
+@admin_router.delete("/{work_id}")
+async def delete_work(
+    work_id: Annotated[int, Path(ge=1, le=2**63 - 1, description="作品ID")],
+    session: DbSession,
+) -> ApiResponse[None]:
+    """删除作品"""
+
+    await work_service.delete(session, [work_id])
+    return ApiResponse.success()
