@@ -30,7 +30,7 @@
 
 `dev` 提供 `/swagger-ui.html` 和 `/v3/api-docs`。编写和维护接口时，优先让 Springdoc 从 Spring MVC 映射、Java 类型和 Bean Validation 推导文档。只有生成的契约缺少调用方需要的语义时，才补最小范围的 Swagger 注解。长示例、业务说明和详细错误列表写进对应模块的 API 文档。
 
-服务在控制台和滚动日志中记录请求 ID。使用响应头 `X-Request-ID` 可以定位该请求的访问记录和异常。开发日志默认位于 `backend/tsuki-app/logs/tsuki.log`，可以用 `TSUKI_LOG_FILE` 指定文件位置。滚动策略由应用主配置管理。
+后端代码使用 Lombok 的 `@Slf4j` 记录日志。Spring Boot 通过 `application.yml` 配置 Logback 的输出和滚动策略。控制台和文件日志记录请求 ID，可通过响应头 `X-Request-ID` 定位该请求的访问记录和异常。开发日志默认位于 `backend/tsuki-app/logs/tsuki.log`，可以用 `TSUKI_LOG_FILE` 指定文件位置。
 
 ## Git 与持续集成
 

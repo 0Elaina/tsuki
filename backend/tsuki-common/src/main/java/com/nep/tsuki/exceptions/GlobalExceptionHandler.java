@@ -1,6 +1,7 @@
 package com.nep.tsuki.exceptions;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -8,7 +9,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.Errors;
-import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
@@ -22,13 +22,16 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import com.nep.tsuki.api.ApiCode;
 import com.nep.tsuki.api.ApiResponse;
+import com.nep.tsuki.api.FieldError;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String TYPE_MISMATCH_MESSAGE = "参数类型不正确";
     private static final String DEFAULT_VALIDATION_MESSAGE = "参数不合法";
-    private static final String GLOBAL_ERROR = "_global";
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
@@ -39,7 +42,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception) {
-        logger.error("请求处理失败", exception);
+        log.error("请求处理失败", exception);
         ApiCode code = ApiCode.INTERNAL_SERVER_ERROR;
         return ResponseEntity.status(code.httpStatus()).body(ApiResponse.error(code));
     }
@@ -49,7 +52,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status, WebRequest request) {
         ApiResponse<Void> response;
         if (status.is5xxServerError()) {
-            logger.error("请求处理失败", exception);
+            log.error("请求处理失败", exception);
             response = ApiResponse.error(ApiCode.INTERNAL_SERVER_ERROR);
         } else {
             response = clientError(exception, status);
@@ -69,14 +72,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 if (result instanceof ParameterErrors bindingErrors) {
                     addBindingErrors(errors, bindingErrors);
                 } else if (!result.getResolvableErrors().isEmpty()) {
-                    String field = Objects.requireNonNullElse(result.getMethodParameter().getParameterName(), GLOBAL_ERROR);
+                    String field = result.getMethodParameter().getParameterName();
                     String message = result.getResolvableErrors().getFirst().getDefaultMessage();
                     errors.putIfAbsent(field, Objects.requireNonNullElse(message, DEFAULT_VALIDATION_MESSAGE));
                 }
             }
             if (!invalidMethod.getCrossParameterValidationResults().isEmpty()) {
                 String message = invalidMethod.getCrossParameterValidationResults().getFirst().getDefaultMessage();
-                errors.putIfAbsent(GLOBAL_ERROR, Objects.requireNonNullElse(message, DEFAULT_VALIDATION_MESSAGE));
+                errors.putIfAbsent(null, Objects.requireNonNullElse(message, DEFAULT_VALIDATION_MESSAGE));
             }
             return validationError(errors);
         }
@@ -94,9 +97,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static void addBindingErrors(Map<String, String> errors, Errors bindingErrors) {
         for (ObjectError error : bindingErrors.getAllErrors()) {
-            String field = GLOBAL_ERROR;
+            String field = null;
             String message = error.getDefaultMessage();
-            if (error instanceof FieldError fieldError) {
+            if (error instanceof org.springframework.validation.FieldError fieldError) {
                 field = fieldError.getField();
                 if (fieldError.isBindingFailure()) {
                     message = TYPE_MISMATCH_MESSAGE;
@@ -108,6 +111,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static ApiResponse<Void> validationError(Map<String, String> errors) {
         ApiCode code = ApiCode.VALIDATION_FAILED;
-        return new ApiResponse<>(null, code.code(), code.message(), errors);
+        List<FieldError> fieldErrors = errors.entrySet().stream()
+                .map(entry -> new FieldError(entry.getKey(), entry.getValue()))
+                .toList();
+        return new ApiResponse<>(null, code.code(), code.message(), fieldErrors);
     }
 }

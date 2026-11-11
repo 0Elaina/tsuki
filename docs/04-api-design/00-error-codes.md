@@ -1,6 +1,6 @@
 # 全局错误码
 
-HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串，`message` 是可展示的提示。统一响应包含 `data`、`code`、`message`、`errors`。普通错误的 `data` 为 `null`，`errors` 为 `{}`。成功响应的 `errors` 也为 `{}`。Spring Boot 的 `/error` 回退使用框架默认格式。
+HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串，`message` 是可展示的提示。统一响应包含 `data`、`code`、`message`、`errors`。普通错误的 `data` 为 `null`。成功和普通错误的 `errors` 为 `[]`。Spring Boot 的 `/error` 回退使用框架默认格式。
 
 | HTTP 状态 | 错误码 | 默认提示 |
 | --- | --- | --- |
@@ -14,15 +14,18 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 
 ## 字段校验错误
 
-`VALIDATION_FAILED` 的 `data` 为 `null`。`errors` 的键是字段名或嵌套字段路径，值是该字段的第一条提示。直接约束方法参数时使用 Java 参数名，表单级问题使用 `_global`。
+`VALIDATION_FAILED` 的 `data` 为 `null`。`errors` 是由 `field` 和 `message` 组成的数组。`field` 使用字段名或嵌套字段路径，直接约束方法参数时使用 Java 参数名。表单级问题的 `field` 为 `null`，同一字段或表单级问题保留首条提示。
 
 ```json
 {
   "data": null,
   "code": "VALIDATION_FAILED",
   "message": "请求参数校验失败",
-  "errors": {
-    "size": "页大小不能超过 100"
-  }
+  "errors": [
+    {
+      "field": "size",
+      "message": "页大小不能超过 100"
+    }
+  ]
 }
 ```

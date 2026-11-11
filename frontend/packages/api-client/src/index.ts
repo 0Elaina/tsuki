@@ -24,18 +24,25 @@ type RequestOptions<T> = Pick<
   schema?: z.ZodType<T>;
 };
 
+const fieldErrorSchema = z.object({
+  field: z.string().nullable(),
+  message: z.string(),
+});
+
+export type FieldError = z.infer<typeof fieldErrorSchema>;
+
 const responseSchema = z
   .object({
     data: z.unknown(),
     code: z.string(),
     message: z.string(),
-    errors: z.record(z.string(), z.string()),
+    errors: z.array(fieldErrorSchema),
   })
   .refine(({ data }) => data !== undefined);
 
 export class RequestError extends Error {
   readonly code: string;
-  readonly errors: Record<string, string>;
+  readonly errors: FieldError[];
   readonly status?: number;
   readonly requestId?: string;
 
@@ -43,7 +50,7 @@ export class RequestError extends Error {
     message: string,
     options: {
       code: string;
-      errors?: Record<string, string>;
+      errors?: FieldError[];
       status?: number;
       requestId?: string;
     },
@@ -51,7 +58,7 @@ export class RequestError extends Error {
     super(message);
     this.name = "RequestError";
     this.code = options.code;
-    this.errors = options.errors ?? {};
+    this.errors = options.errors ?? [];
     this.status = options.status;
     this.requestId = options.requestId;
   }

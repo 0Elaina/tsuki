@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -16,12 +14,13 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RequestLoggingFilter.class);
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
     private static final String REQUEST_ID_KEY = "requestId";
 
@@ -45,7 +44,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             }
             long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             try {
-                LOGGER.info("method={} path={} status={} durationMs={}",
+                log.info("method={} path={} status={} durationMs={}",
                         request.getMethod(), request.getRequestURI(), status, duration);
             } finally {
                 if (previousRequestId == null) {
