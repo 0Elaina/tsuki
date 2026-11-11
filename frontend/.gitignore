@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.eslintcache
+*.timestamp-*-*.mjs
+*.local
+.DS_Store
+*.log
+
+**/.vscode/*
+!**/.vscode/extensions.json
+.idea/

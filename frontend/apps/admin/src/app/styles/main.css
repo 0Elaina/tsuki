@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/**
+ * 设计 token 的 CSS 侧出口。
+ *
+ * 与 `src/app/theme/tokens.ts` 保持同源：TS 那份喂给 Naive UI 的 themeOverrides，
+ * 这份生成 Tailwind 工具类。两处色值必须同步修改。
+ */
+@theme {
+  --color-moon: #f7f8fb;
+  --color-surface: #ffffff;
+  --color-ink: #1f2b45;
+  --color-ink-soft: #4a5b7e;
+  --color-ink-hover: #2b3a5c;
+  --color-fg: #232a3b;
+  --color-fg-muted: #6b7285;
+  --color-fg-subtle: #9aa0b4;
+  --color-line: #e8eaf2;
+  --color-line-hover: #d5d9e8;
+  --color-sakura: #f2789f;
+  --color-sakura-soft: #fdedf3;
+
+  --radius-small: 8px;
+  --radius-base: 10px;
+  --radius-large: 14px;
+  --radius-xl: 18px;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Helvetica Neue", Inter, system-ui, sans-serif;
+  --font-mono:
+    "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --shadow-soft-sm: 0 1px 2px rgb(31 43 69 / 4%);
+  --shadow-soft-md: 0 4px 12px rgb(31 43 69 / 6%);
+  --shadow-soft-lg: 0 12px 32px rgb(31 43 69 / 8%);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-moon);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  /* 数字等宽，避免表格与统计数字跳动 */
+  .tabular,
+  td,
+  th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 统一键盘焦点环，颜色走樱粉，与点击态的墨蓝区分 */
+  :focus-visible {
+    outline: 2px solid var(--color-sakura);
+    outline-offset: 2px;
+  }
+}
