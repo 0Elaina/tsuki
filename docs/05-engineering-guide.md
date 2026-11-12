@@ -22,14 +22,14 @@
 
 在完成后端启动与 Flyway 建表后，通过交互式终端生成 `{bcrypt}` 密码哈希并手工插入 `user_accounts`：
 
-1. 在 `backend/` 目录下编译 `tsuki-auth`、导出依赖类路径并在真实终端运行 `PasswordHashGenerator`（依赖 `System.console()`，不支持非 TTY 控制台；密码不能为空且 UTF-8 编码不超过 72 字节）：
+1. 在 `backend/` 目录下编译 `tsuki-auth`、导出依赖类路径并在真实终端运行 `PasswordHashGenerator`（依赖 `System.console()`，不支持非 TTY 控制台；密码需为 8 到 72 位可见 ASCII 字符，且不能包含空格）：
 
 ```bash
 ./mvnw -pl tsuki-auth -am compile dependency:build-classpath -Dmdep.outputFile="$PWD/tsuki-auth/target/auth.cp"
 java -cp "tsuki-auth/target/classes:$(cat "$PWD/tsuki-auth/target/auth.cp")" com.nep.tsuki.auth.tools.PasswordHashGenerator
 ```
 
-2. 连接本地 PostgreSQL 的 `tsuki` 数据库，将工具输出的完整 `{bcrypt}...` 哈希写入管理员记录（`username` 须满足小写规范 `^[a-z][a-z0-9_]{2,31}$`，主键和时间戳由数据库填充）：
+2. 连接本地 PostgreSQL 的 `tsuki` 数据库，将工具输出的完整 `{bcrypt}...` 哈希写入管理员记录（`username` 填小写用户名，不超过 64 位，且建议符合应用层 3–32 位字母、数字和下划线规则，主键和时间戳由数据库填充）：
 
 ```sql
 INSERT INTO user_accounts (username, nickname, password_hash, role, status)

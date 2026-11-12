@@ -9,8 +9,8 @@
 | 字段名 | 类型 | 约束(PK/FK/UNIQUE/NOT NULL/DEFAULT) | 说明（枚举须写全映射） |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, GENERATED ALWAYS AS IDENTITY, NOT NULL | 主键 ID |
-| username | VARCHAR(32) | UNIQUE, NOT NULL, CHECK(`ck_user_accounts_username_format`) | 规范化小写登录用户名，在 `C` 排序规则下匹配 `^[a-z][a-z0-9_]{2,31}$` |
-| nickname | VARCHAR(32) | NOT NULL | 展示昵称，允许重复 |
+| username | VARCHAR(64) | UNIQUE, NOT NULL | 规范化小写登录用户名 |
+| nickname | VARCHAR(64) | NOT NULL | 展示昵称，允许重复 |
 | password_hash | TEXT | NOT NULL | `DelegatingPasswordEncoder` 格式的密码哈希（`{bcrypt}...`） |
 | role | VARCHAR(16) | NOT NULL | 账号角色枚举名称：`ADMIN`=管理员，`USER`=听众用户 |
 | status | VARCHAR(16) | NOT NULL | 账号状态枚举名称：`ACTIVE`=正常启用，`DISABLED`=停用 |
@@ -33,21 +33,20 @@
 ```sql
 CREATE TABLE user_accounts (
     id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
-    username VARCHAR(32) NOT NULL,
-    nickname VARCHAR(32) NOT NULL,
+    username VARCHAR(64) NOT NULL,
+    nickname VARCHAR(64) NOT NULL,
     password_hash TEXT NOT NULL,
     role VARCHAR(16) NOT NULL,
     status VARCHAR(16) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_user_accounts PRIMARY KEY (id),
-    CONSTRAINT uk_user_accounts_username UNIQUE (username),
-    CONSTRAINT ck_user_accounts_username_format CHECK (username COLLATE "C" ~ '^[a-z][a-z0-9_]{2,31}$')
+    CONSTRAINT uk_user_accounts_username UNIQUE (username)
 );
 
 COMMENT ON TABLE user_accounts IS '统一账号表，保存管理端与听众端账号凭据、角色与状态';
 COMMENT ON COLUMN user_accounts.id IS '主键 ID';
-COMMENT ON COLUMN user_accounts.username IS '规范化小写登录用户名，匹配 ^[a-z][a-z0-9_]{2,31}$';
+COMMENT ON COLUMN user_accounts.username IS '规范化小写登录用户名';
 COMMENT ON COLUMN user_accounts.nickname IS '展示昵称，允许重复';
 COMMENT ON COLUMN user_accounts.password_hash IS 'DelegatingPasswordEncoder 格式的密码哈希（{bcrypt}...）';
 COMMENT ON COLUMN user_accounts.role IS '账号角色枚举名称：ADMIN=管理员，USER=听众用户';
@@ -55,4 +54,3 @@ COMMENT ON COLUMN user_accounts.status IS '账号状态枚举名称：ACTIVE=正
 COMMENT ON COLUMN user_accounts.created_at IS '创建时间（UTC 带时区时间戳）';
 COMMENT ON COLUMN user_accounts.updated_at IS '最后更新时间（UTC 带时区时间戳）';
 ```
-
