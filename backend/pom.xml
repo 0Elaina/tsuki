@@ -27,6 +27,28 @@
 	</properties>
 	<dependencyManagement>
 		<dependencies>
+			<!-- 内部子模块统一版本 -->
+			<dependency>
+				<groupId>com.nep.tsuki</groupId>
+				<artifactId>tsuki-common</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.nep.tsuki</groupId>
+				<artifactId>tsuki-user</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.nep.tsuki</groupId>
+				<artifactId>tsuki-auth</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.nep.tsuki</groupId>
+				<artifactId>tsuki-app</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+
 			<dependency>
 				<groupId>com.baomidou</groupId>
 				<artifactId>mybatis-plus-bom</artifactId>
