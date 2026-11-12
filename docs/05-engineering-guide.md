@@ -16,7 +16,24 @@
 
 ## 启动后端
 
-在 `backend/` 执行 `./mvnw -pl tsuki-app -am spring-boot:run`。主配置默认激活 `dev`，该 profile 导入 `tsuki-app/config/application-dev.yml` 中的本机 PostgreSQL 连接参数。启动时查看 Flyway 连接的数据库和 `Started TsukiApplication` 日志。
+在 `backend/` 执行 `./mvnw -pl tsuki-app -am spring-boot:run`。主配置默认激活 `dev`，该 profile 导入 `tsuki-app/config/application-dev.yml` 中的本机配置参数。启动时查看 Flyway 连接的数据库和 `Started TsukiApplication` 日志。
+
+本地 `dev` 启动前，除 PostgreSQL 连接参数外，还需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供非空的认证配置：
+
+- `tsuki.auth.issuer`（`TSUKI_AUTH_ISSUER`）
+- `tsuki.auth.access-secret`（`TSUKI_AUTH_ACCESS_SECRET`，Base64 解码后至少 32 字节）
+- `tsuki.auth.admin-aud`（`TSUKI_AUTH_ADMIN_AUD`）
+- `tsuki.auth.access-ttl`（`TSUKI_AUTH_ACCESS_TTL`，默认 `15m`，至少 `1m`）
+
+Redis 连接参数在公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
+
+### 生产环境配置（prod profile）
+
+生产环境通过 `SPRING_PROFILES_ACTIVE=prod`（或 `--spring.profiles.active=prod`）激活 `prod` profile，支持通过环境变量或同目录下的 `config/application-prod.yml` 提供敏感配置：
+
+- 数据库连接：`TSUKI_DB_URL`、`TSUKI_DB_USERNAME`、`TSUKI_DB_PASSWORD`
+- 认证与 Redis：复用上述 `TSUKI_AUTH_*` 与 `TSUKI_REDIS_*` 环境变量
+- 反代与监听：`prod` 固定监听 `server.address: 127.0.0.1`，启用 `server.forward-headers-strategy: native`，并将 `server.tomcat.remoteip.internal-proxies` 限定为 `"127\\.0\\.0\\.1"`，由同机 HTTPS 反向代理终止 TLS 并转发真实客户端地址。
 
 ### 初始化管理员账号
 

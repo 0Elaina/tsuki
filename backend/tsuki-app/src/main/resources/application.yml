@@ -11,6 +11,11 @@ spring:
         fail-on-numbers-for-enums: true
   flyway:
     locations: classpath:db/migration
+  data:
+    redis:
+      host: "${TSUKI_REDIS_HOST:127.0.0.1}"
+      port: "${TSUKI_REDIS_PORT:6379}"
+      password: "${TSUKI_REDIS_PASSWORD:}"
 
 logging:
   file:
@@ -32,8 +37,14 @@ springdoc:
     enabled: false
     disable-swagger-default-url: true
 
----
+tsuki:
+  auth:
+    issuer: "${TSUKI_AUTH_ISSUER:}"
+    access-secret: "${TSUKI_AUTH_ACCESS_SECRET:}"
+    admin-aud: "${TSUKI_AUTH_ADMIN_AUD:}"
+    access-ttl: "${TSUKI_AUTH_ACCESS_TTL:15m}"
 
+---
 spring:
   config:
     activate:
@@ -48,3 +59,25 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+    import:
+      - optional:file:config/application-prod.yml
+      - optional:file:./config/application-prod.yml
+      - optional:file:../config/application-prod.yml
+  datasource:
+    url: "${TSUKI_DB_URL:}"
+    username: "${TSUKI_DB_USERNAME:}"
+    password: "${TSUKI_DB_PASSWORD:}"
+    driver-class-name: org.postgresql.Driver
+
+server:
+  address: 127.0.0.1
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: "127\\.0\\.0\\.1"
