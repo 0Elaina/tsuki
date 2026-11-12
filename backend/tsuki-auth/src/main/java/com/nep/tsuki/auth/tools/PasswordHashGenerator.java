@@ -1,15 +1,18 @@
 package com.nep.tsuki.auth.tools;
 
 import java.io.Console;
-import java.nio.charset.StandardCharsets;
+import java.nio.CharBuffer;
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.nep.tsuki.auth.constants.AuthValidationConstants;
+
 public final class PasswordHashGenerator {
 
-    private static final int MAX_BCRYPT_PASSWORD_BYTES = 72;
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile(AuthValidationConstants.PASSWORD_REGEX);
 
     private PasswordHashGenerator() {
     }
@@ -28,14 +31,10 @@ public final class PasswordHashGenerator {
                 System.err.println("未读取到输入，已取消");
                 return;
             }
-            if (passwordChars.length == 0) {
-                System.err.println("密码不能为空");
-                return;
-            }
 
-            String password = new String(passwordChars);
-            if (password.getBytes(StandardCharsets.UTF_8).length > MAX_BCRYPT_PASSWORD_BYTES) {
-                System.err.println("密码 UTF-8 编码长度不能超过 72 字节");
+            CharSequence password = CharBuffer.wrap(passwordChars);
+            if (!PASSWORD_PATTERN.matcher(password).matches()) {
+                System.err.println("密码需为 8 到 72 位可见 ASCII 字符，且不能包含空格");
                 return;
             }
 
@@ -48,4 +47,3 @@ public final class PasswordHashGenerator {
         }
     }
 }
-
