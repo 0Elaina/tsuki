@@ -18,6 +18,24 @@
 
 在 `backend/` 执行 `./mvnw -pl tsuki-app -am spring-boot:run`。主配置默认激活 `dev`，该 profile 导入 `tsuki-app/config/application-dev.yml` 中的本机 PostgreSQL 连接参数。启动时查看 Flyway 连接的数据库和 `Started TsukiApplication` 日志。
 
+### 初始化管理员账号
+
+在完成后端启动与 Flyway 建表后，通过交互式终端生成 `{bcrypt}` 密码哈希并手工插入 `user_accounts`：
+
+1. 在 `backend/` 目录下编译 `tsuki-auth`、导出依赖类路径并在真实终端运行 `PasswordHashGenerator`（依赖 `System.console()`，不支持非 TTY 控制台；密码需为 8 到 72 位可见 ASCII 字符，且不能包含空格）：
+
+```bash
+./mvnw -pl tsuki-auth -am compile dependency:build-classpath -Dmdep.outputFile="$PWD/tsuki-auth/target/auth.cp"
+java -cp "tsuki-auth/target/classes:$(cat "$PWD/tsuki-auth/target/auth.cp")" com.nep.tsuki.auth.tools.PasswordHashGenerator
+```
+
+2. 连接本地 PostgreSQL 的 `tsuki` 数据库，将工具输出的完整 `{bcrypt}...` 哈希写入管理员记录（`username` 填小写用户名，不超过 64 位，且建议符合应用层 3–32 位字母、数字和下划线规则，主键和时间戳由数据库填充）：
+
+```sql
+INSERT INTO user_accounts (username, nickname, password_hash, role, status)
+VALUES ('admin', 'admin', '{bcrypt}$2a$10$替换为工具输出的完整哈希', 'ADMIN', 'ACTIVE');
+```
+
 ## 启动前端
 
 使用 Node 24 和 pnpm 12.11.2。在 `frontend/` 执行 `pnpm install`，再执行 `pnpm dev` 启动管理端。`pnpm check` 依次运行类型检查、ESLint、Prettier 格式检查和构建。`pnpm build` 生成管理端静态产物，`pnpm preview` 在本地预览构建结果。
