@@ -32,8 +32,14 @@ springdoc:
     enabled: false
     disable-swagger-default-url: true
 
----
+tsuki:
+  auth:
+    issuer: "${TSUKI_AUTH_ISSUER:}"
+    access-secret: "${TSUKI_AUTH_ACCESS_SECRET:}"
+    admin-aud: "${TSUKI_AUTH_ADMIN_AUD:}"
+    access-ttl: "${TSUKI_AUTH_ACCESS_TTL:15m}"
 
+---
 spring:
   config:
     activate:
