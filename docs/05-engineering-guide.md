@@ -18,12 +18,15 @@
 
 在 `backend/` 执行 `./mvnw -pl tsuki-app -am spring-boot:run`。主配置默认激活 `dev`，该 profile 导入 `tsuki-app/config/application-dev.yml` 中的本机配置参数。启动时查看 Flyway 连接的数据库和 `Started TsukiApplication` 日志。
 
-本地 `dev` 启动前，除 PostgreSQL 连接参数外，还需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供非空的认证配置：
+本地 `dev` 启动前，除 PostgreSQL 连接参数外，还需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供非空的认证配置，其余有效期项均带默认值：
 
 - `tsuki.auth.issuer`（`TSUKI_AUTH_ISSUER`）
-- `tsuki.auth.access-secret`（`TSUKI_AUTH_ACCESS_SECRET`，Base64 解码后至少 32 字节）
-- `tsuki.auth.admin-aud`（`TSUKI_AUTH_ADMIN_AUD`）
+- `tsuki.auth.secret`（`TSUKI_AUTH_SECRET`，Base64 解码后至少 32 字节）
 - `tsuki.auth.access-ttl`（`TSUKI_AUTH_ACCESS_TTL`，默认 `15m`，至少 `1m`）
+- `tsuki.auth.refresh-admin-idle-ttl`（`TSUKI_AUTH_REFRESH_ADMIN_IDLE_TTL`，默认 `2h`，至少 `1h`）
+- `tsuki.auth.refresh-admin-abs-ttl`（`TSUKI_AUTH_REFRESH_ADMIN_ABS_TTL`，默认 `24h`，至少 `1h`）
+- `tsuki.auth.refresh-user-idle-ttl`（`TSUKI_AUTH_REFRESH_USER_IDLE_TTL`，默认 `7d`，至少 `1d`）
+- `tsuki.auth.refresh-user-abs-ttl`（`TSUKI_AUTH_REFRESH_USER_ABS_TTL`，默认 `30d`，至少 `1d`）
 
 Redis 连接参数在公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
 

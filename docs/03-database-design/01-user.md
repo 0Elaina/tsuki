@@ -26,7 +26,7 @@
 
 **关系**
 
-当前暂无外键关系。后续听众资料与认证会话表将关联本表 `id`。
+当前表本身不持有外键。`auth_sessions.account_id` 以 `ON DELETE RESTRICT` 引用本表 `id`；后续听众资料表也将关联本表 `id`。
 
 **建表 SQL**
 
