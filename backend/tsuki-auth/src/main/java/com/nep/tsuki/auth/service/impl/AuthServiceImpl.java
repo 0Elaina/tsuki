@@ -143,7 +143,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 账号复查
         AuthenticatedAccount authenticatedAccount = accountAuthenticateService.findActiveById(accountId);
-        if (!authenticatedAccount.accountType().equals(accountType)) {
+        if (authenticatedAccount == null || !authenticatedAccount.accountType().equals(accountType)) {
             authSessionService.revoke(authSession, nowUtc);
             throw new BusinessException(AuthApiCode.INVALID_REFRESH_TOKEN);
         }

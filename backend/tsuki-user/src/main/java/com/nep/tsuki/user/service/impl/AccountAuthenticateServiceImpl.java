@@ -65,7 +65,8 @@ public class AccountAuthenticateServiceImpl implements AccountAuthenticateServic
     public AuthenticatedAccount findActiveById(Long accountId) {
         UserAccount userAccount = userAccountMapper.selectById(accountId);
         if (userAccount == null || !AccountStatus.ACTIVE.name().equals(userAccount.getStatus())) {
-            throw new BusinessException(AccountApiCode.ACCOUNT_DISABLED);
+            // 返回空, 交给调用方撤销会话
+            return null;
         }
         return new AuthenticatedAccount(
                 userAccount.getId(), AccountTypeUtils.getAccountType(userAccount.getRole()));
