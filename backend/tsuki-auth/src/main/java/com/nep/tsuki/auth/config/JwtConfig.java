@@ -1,7 +1,6 @@
 package com.nep.tsuki.auth.config;
 
 import java.util.Base64;
-import java.util.List;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -13,7 +12,6 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -23,38 +21,50 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 
+import com.nep.tsuki.auth.constants.JwtConstants;
+import com.nep.tsuki.auth.model.enums.TokenType;
+
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(JwtProperties.class)
 public class JwtConfig {
     @Bean
-    SecretKey accessSigningKey(JwtProperties jwtProperties) {
+    SecretKey secretKey(JwtProperties jwtProperties) {
         byte[] bytes;
         try {
-            bytes = Base64.getDecoder().decode(jwtProperties.accessSecret());
+            bytes = Base64.getDecoder().decode(jwtProperties.secret());
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("access-secret 配置错误，非法的 Base64 编码");
+            throw new IllegalStateException("secret 配置错误，非法的 Base64 编码");
         }
         if (bytes.length < 32) {
-            throw new IllegalStateException("access-secret 配置错误，长度不能小于 32 字节");
+            throw new IllegalStateException("secret 配置错误，长度不能小于 32 字节");
         }
         return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
     @Bean
-    JwtEncoder jwtEncoder(SecretKey accessSigningKey) {
-        return NimbusJwtEncoder.withSecretKey(accessSigningKey).algorithm(MacAlgorithm.HS256).build();
+    JwtEncoder jwtEncoder(SecretKey secretKey) {
+        return NimbusJwtEncoder.withSecretKey(secretKey).algorithm(MacAlgorithm.HS256).build();
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey accessSigningKey, JwtProperties jwtProperties) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(accessSigningKey).macAlgorithm(MacAlgorithm.HS256)
+    JwtDecoder accessJwtDecoder(SecretKey secretKey, JwtProperties jwtProperties) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256)
                 .build();
-        OAuth2TokenValidator<Jwt> audienceValidator = new JwtClaimValidator<List<String>>(
-                JwtClaimNames.AUD,
-                aud -> aud != null && aud.contains(jwtProperties.adminAud()));
+        OAuth2TokenValidator<Jwt> typeValidator = new JwtClaimValidator<String>(JwtConstants.TOKEN_TYPE,
+                TokenType.ACCESS.name()::equals);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()),
-                audienceValidator));
+                JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()), typeValidator));
+        return decoder;
+    }
+
+    @Bean
+    JwtDecoder refreshJwtDecoder(SecretKey secretKey, JwtProperties jwtProperties) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey).macAlgorithm(MacAlgorithm.HS256)
+                .build();
+        OAuth2TokenValidator<Jwt> typeValidator = new JwtClaimValidator<String>(JwtConstants.TOKEN_TYPE,
+                TokenType.REFRESH.name()::equals);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()), typeValidator));
         return decoder;
     }
 

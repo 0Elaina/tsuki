@@ -9,16 +9,11 @@ public final class AccountTypeUtils {
     private AccountTypeUtils() {
     }
 
-    public static List<AccountRole> getAdminRoles() {
-        return List.of(AccountRole.ADMIN);
-    }
-
-    public static List<AccountRole> getUserRoles() {
-        return List.of(AccountRole.USER);
-    }
+    public static final List<AccountRole> ADMIN_ROLES = List.of(AccountRole.ADMIN);
+    public static final List<AccountRole> USER_ROLES = List.of(AccountRole.USER);
 
     public static AccountType getAccountType(AccountRole role) {
-        if (getAdminRoles().contains(role)) {
+        if (ADMIN_ROLES.contains(role)) {
             return AccountType.ADMIN;
         }
         return AccountType.USER;

@@ -54,4 +54,21 @@ public class AccountAuthenticateServiceImpl implements AccountAuthenticateServic
         return new AuthenticatedAccount(
                 userAccount.getId(), AccountTypeUtils.getAccountType(userAccount.getRole()));
     }
+
+    /**
+     * 获取已激活的账号信息
+     * 
+     * @param accountId 账号ID
+     * @return 账号信息
+     */
+    @Override
+    public AuthenticatedAccount findActiveById(Long accountId) {
+        UserAccount userAccount = userAccountMapper.selectById(accountId);
+        if (userAccount == null || !AccountStatus.ACTIVE.name().equals(userAccount.getStatus())) {
+            // 返回空, 交给调用方撤销会话
+            return null;
+        }
+        return new AuthenticatedAccount(
+                userAccount.getId(), AccountTypeUtils.getAccountType(userAccount.getRole()));
+    }
 }

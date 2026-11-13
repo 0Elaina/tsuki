@@ -1,5 +1,6 @@
 package com.nep.tsuki.auth.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -7,6 +8,7 @@ import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -21,6 +23,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, RestAccessDeniedHandler restAccessDeniedHandler,
             RestAuthenticationEntryPoint restAuthenticationEntryPoint, Environment environment,
+            @Qualifier("accessJwtDecoder") JwtDecoder accessJwtDecoder,
             JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -39,7 +42,9 @@ public class SecurityConfig {
                     auth.anyRequest().denyAll();
                 })
                 .oauth2ResourceServer(o -> o.jwt(
-                        jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
+                        jwt -> jwt
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter)
+                                .decoder(accessJwtDecoder))
                         .authenticationEntryPoint(restAuthenticationEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler))
                 .exceptionHandling(e -> e.authenticationEntryPoint(restAuthenticationEntryPoint)

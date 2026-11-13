@@ -11,4 +11,12 @@ public interface AccountAuthenticateService {
      * @return 认证后的账号信息
      */
     AuthenticatedAccount authenticate(String username, String password);
+
+    /**
+     * 获取已激活的账号信息
+     * 
+     * @param accountId 账号ID
+     * @return 账号信息
+     */
+    AuthenticatedAccount findActiveById(Long accountId);
 }

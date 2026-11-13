@@ -40,9 +40,12 @@ springdoc:
 tsuki:
   auth:
     issuer: "${TSUKI_AUTH_ISSUER:}"
-    access-secret: "${TSUKI_AUTH_ACCESS_SECRET:}"
-    admin-aud: "${TSUKI_AUTH_ADMIN_AUD:}"
+    secret: "${TSUKI_AUTH_SECRET:}"
     access-ttl: "${TSUKI_AUTH_ACCESS_TTL:15m}"
+    refresh-admin-idle-ttl: "${TSUKI_AUTH_REFRESH_ADMIN_IDLE_TTL:2h}"
+    refresh-admin-abs-ttl: "${TSUKI_AUTH_REFRESH_ADMIN_ABS_TTL:24h}"
+    refresh-user-idle-ttl: "${TSUKI_AUTH_REFRESH_USER_IDLE_TTL:7d}"
+    refresh-user-abs-ttl: "${TSUKI_AUTH_REFRESH_USER_ABS_TTL:30d}"
 
 ---
 spring:
