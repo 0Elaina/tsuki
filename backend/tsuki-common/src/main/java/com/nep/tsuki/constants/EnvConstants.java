@@ -5,4 +5,5 @@ public final class EnvConstants {
     }
 
     public static final String DEV = "dev";
+    public static final String PROD = "prod";
 }
