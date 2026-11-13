@@ -6,6 +6,7 @@ import com.nep.tsuki.exceptions.BusinessException;
 import com.nep.tsuki.user.constants.AccountApiCode;
 import com.nep.tsuki.user.mapper.UserAccountMapper;
 import com.nep.tsuki.user.model.entity.UserAccount;
+import com.nep.tsuki.user.model.enums.AccountStatus;
 import com.nep.tsuki.user.model.vo.AccountIdentityResponse;
 import com.nep.tsuki.user.service.AccountService;
 
@@ -32,6 +33,9 @@ public class AccountServiceImpl implements AccountService {
         UserAccount userAccount = userAccountMapper.selectById(id);
         if (userAccount == null) {
             throw new BusinessException(AccountApiCode.ACCOUNT_NOT_FOUND);
+        }
+        if (!AccountStatus.ACTIVE.name().equals(userAccount.getStatus())) {
+            throw new BusinessException(AccountApiCode.ACCOUNT_DISABLED);
         }
         return AccountIdentityResponse.of(userAccount);
     }

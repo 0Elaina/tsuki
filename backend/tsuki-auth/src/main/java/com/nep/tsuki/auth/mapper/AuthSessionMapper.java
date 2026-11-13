@@ -1,5 +1,8 @@
 package com.nep.tsuki.auth.mapper;
 
+import java.time.OffsetDateTime;
+
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -23,4 +26,13 @@ public interface AuthSessionMapper extends BaseMapper<AuthSession> {
             FOR UPDATE
             """)
     AuthSession selectByIdForUpdate(@Param("id") String id);
+
+    /**
+     * 删除在指定截止时间之前的过期会话
+     * 
+     * @param cutoff 截止时间
+     * @return 删除的行数
+     */
+    @Delete("DELETE FROM auth_sessions WHERE expires_at < #{cutoff}")
+    int deleteExpiredBefore(@Param("cutoff") OffsetDateTime cutoff);
 }

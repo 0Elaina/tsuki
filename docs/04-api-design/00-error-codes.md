@@ -31,3 +31,14 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
   ]
 }
 ```
+
+## 业务错误码
+
+| HTTP 状态 | 错误码 | 默认提示 | 所属模块 |
+| --- | --- | --- | --- |
+| 401 | `INVALID_CREDENTIALS` | 非法的凭据 | `tsuki-user` |
+| 403 | `ACCOUNT_DISABLED` | 账户已停用 | `tsuki-user` |
+| 404 | `ACCOUNT_NOT_FOUND` | 账户不存在 | `tsuki-user` |
+| 401 | `INVALID_REFRESH_TOKEN` | 刷新令牌无效或已过期 | `tsuki-auth` |
+| 429 | `LOGIN_RATE_LIMITED` | 登录请求过于频繁, 请稍候重试 | `tsuki-auth` |
+| 503 | `LOGIN_UNAVAILABLE` | 登录服务暂时不可用, 请稍后再试 | `tsuki-auth` |
