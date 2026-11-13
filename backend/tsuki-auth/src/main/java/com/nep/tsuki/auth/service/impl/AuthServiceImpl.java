@@ -72,7 +72,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IssuedTokens login(String username, String password, String clientIp, AccountType accountType) {
-        loginRateLimitService.checkAndConsume(clientIp, username);
+        loginRateLimitService.checkAndConsume(accountType, clientIp, username);
         AuthenticatedAccount authenticatedAccount = accountAuthenticateService.authenticate(username, password);
         if (authenticatedAccount.accountType() != accountType) {
             throw new BusinessException(ApiCode.ACCESS_DENIED);

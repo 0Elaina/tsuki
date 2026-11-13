@@ -1,6 +1,7 @@
 package com.nep.tsuki.auth.service.impl;
 
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataAccessException;
@@ -11,6 +12,7 @@ import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.AuthRedisConstants;
+import com.nep.tsuki.auth.model.enums.AccountType;
 import com.nep.tsuki.auth.service.LoginRateLimitService;
 import com.nep.tsuki.exceptions.BusinessException;
 
@@ -28,16 +30,19 @@ public class LoginRateLimitServiceImpl implements LoginRateLimitService {
     /**
      * 检查并消耗登录次数
      * 
-     * @param clientIp 客户端IP
-     * @param username 用户名
+     * @param accountType 账户类型
+     * @param clientIp    客户端IP
+     * @param username    用户名
      */
     @Override
-    public void checkAndConsume(String clientIp, String username) {
-        if (!StringUtils.hasText(clientIp) || !StringUtils.hasText(username)) {
-            throw new IllegalArgumentException("IP地址和用户名不能为空");
+    public void checkAndConsume(AccountType accountType, String clientIp, String username) {
+        if (accountType == null || !StringUtils.hasText(clientIp) || !StringUtils.hasText(username)) {
+            throw new IllegalArgumentException("账号类型、IP地址和用户名不能为空");
         }
-        consumeQuota(AuthRedisConstants.IP_KEY_PREFIX + clientIp, AuthRedisConstants.IP_MAX_ATTEMPTS);
-        consumeQuota(AuthRedisConstants.USERNAME_KEY_PREFIX + username, AuthRedisConstants.USERNAME_MAX_ATTEMPTS);
+        String keyPrefix = AuthRedisConstants.LOGIN_KEY_PREFIX + accountType.name().toLowerCase(Locale.ROOT);
+        consumeQuota(keyPrefix + AuthRedisConstants.IP_KEY_SEGMENT + clientIp, AuthRedisConstants.IP_MAX_ATTEMPTS);
+        consumeQuota(keyPrefix + AuthRedisConstants.USERNAME_KEY_SEGMENT + username,
+                AuthRedisConstants.USERNAME_MAX_ATTEMPTS);
     }
 
     private void consumeQuota(String key, long maxAttempts) {
