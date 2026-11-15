@@ -1,8 +1,7 @@
-import type { FieldError } from "@tsuki/api-client";
+import { isValidationError, type FieldError } from "@tsuki/api-client";
 import type { FormItemProps } from "naive-ui";
 import { computed, shallowRef } from "vue";
-
-import { isValidationError } from "@/shared/api/errors";
+import { ERROR_FEEDBACK } from "../api/query-meta";
 
 export function useFormErrors() {
   const errors = shallowRef<FieldError[]>([]);
@@ -18,7 +17,7 @@ export function useFormErrors() {
   }
 
   const mutationOptions = {
-    meta: { errorFeedback: "form" },
+    meta: { errorFeedback: ERROR_FEEDBACK.FORM },
     onMutate() {
       errors.value = [];
     },

@@ -17,7 +17,7 @@ flowchart LR
     Catalog --> Postgres["PostgreSQL 项目库"]
 ```
 
-两个前端应用共用一个 pnpm workspace，各自构建，按自身业务组织页面、组件和请求逻辑。管理端的数据维护界面与听众端的播放界面可以独立演进，共用 workspace 管理工具链和锁文件。 [pnpm Workspace](https://pnpm.io/workspaces/)
+两个前端应用共用一个 pnpm workspace，各自构建，按自身业务组织页面、组件和请求逻辑；跨端复用的无框架 HTTP 客户端、响应解包、401 单飞刷新与认证契约抽离在 `packages/api-client` 中，管理端的数据维护界面与听众端的播放界面则保持独立演进，共用 workspace 管理工具链和锁文件。 [pnpm Workspace](https://pnpm.io/workspaces/)
 
 ## 技术选型
 

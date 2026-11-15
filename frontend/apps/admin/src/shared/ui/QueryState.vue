@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { UseQueryReturnType } from "@tanstack/vue-query";
+import { getErrorMessage } from "@tsuki/api-client";
 import { NButton, NEmpty, NResult, NSpin } from "naive-ui";
-
-import { getErrorMessage } from "@/shared/api/errors";
 
 const props = defineProps<{
   query: Pick<
