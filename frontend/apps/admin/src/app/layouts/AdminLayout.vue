@@ -93,19 +93,23 @@ function handleUserDropdownSelect(key: string | number): void {
 </script>
 
 <template>
-  <NLayout has-sider class="min-h-screen">
+  <NLayout
+    has-sider
+    class="h-screen bg-moon"
+    content-class="flex h-full gap-3 p-3"
+  >
     <NLayoutSider
-      bordered
       collapse-mode="width"
       :collapsed-width="64"
       :width="228"
       :collapsed="collapsed"
       :native-scrollbar="false"
+      class="overflow-hidden rounded-large border border-line bg-surface shadow-soft-sm"
     >
       <!-- 品牌区 -->
       <RouterLink
         :to="{ name: ROUTE_NAMES.HOME }"
-        class="border-border flex h-14 items-center border-b px-4 no-underline"
+        class="flex h-14 items-center border-b border-line px-4 no-underline"
         :class="collapsed ? 'justify-center' : 'gap-2.5'"
       >
         <div
@@ -123,22 +127,26 @@ function handleUserDropdownSelect(key: string | number): void {
       </RouterLink>
 
       <!-- 导航菜单 -->
-      <NMenu
-        :collapsed="collapsed"
-        :collapsed-width="64"
-        :collapsed-icon-size="20"
-        :options="adminMenuOptions"
-        :value="activeMenuKey"
-        @update:value="handleMenuSelect"
-      />
+      <div class="py-1.5">
+        <NMenu
+          :collapsed="collapsed"
+          :collapsed-width="64"
+          :collapsed-icon-size="20"
+          :options="adminMenuOptions"
+          :value="activeMenuKey"
+          @update:value="handleMenuSelect"
+        />
+      </div>
     </NLayoutSider>
 
     <!-- 主内容区 -->
-    <NLayout>
+    <NLayout
+      class="min-w-0 flex-1 bg-transparent"
+      content-class="flex h-full flex-col gap-3"
+    >
       <!-- 顶栏 -->
       <NLayoutHeader
-        bordered
-        class="flex h-14 items-center justify-between px-6"
+        class="flex h-14 shrink-0 items-center justify-between rounded-large border border-line bg-surface px-5 shadow-soft-sm"
       >
         <!-- 左侧区域 -->
         <NFlex align="center" :size="12" :wrap="false">
@@ -224,7 +232,11 @@ function handleUserDropdownSelect(key: string | number): void {
       </NLayoutHeader>
 
       <!-- 内容区 -->
-      <NLayoutContent content-class="p-6">
+      <NLayoutContent
+        class="min-h-0 flex-1"
+        :native-scrollbar="false"
+        content-class="pb-2"
+      >
         <RouterView />
       </NLayoutContent>
     </NLayout>
