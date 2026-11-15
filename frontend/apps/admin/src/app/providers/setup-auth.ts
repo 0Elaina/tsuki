@@ -1,4 +1,4 @@
-import { useAuthStore } from "@/features/auth/model/auth.store";
+import { useAuthStore } from "@/features/auth/stores/auth.store";
 import { apiClient } from "@/shared/api/request";
 import { attachAuthInterceptor } from "@tsuki/api-client";
 import { queryClient } from "./query-client";
