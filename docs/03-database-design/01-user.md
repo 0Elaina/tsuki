@@ -2,7 +2,7 @@
 
 ## user_accounts 表
 
-统一账号表，保存管理端与听众端账号凭据、角色与状态。
+统一账号表，保存管理端与用户端账号凭据、角色与状态。
 
 **字段**
 
@@ -12,7 +12,7 @@
 | username | VARCHAR(64) | UNIQUE, NOT NULL | 规范化小写登录用户名 |
 | nickname | VARCHAR(64) | NOT NULL | 展示昵称，允许重复 |
 | password_hash | TEXT | NOT NULL | `DelegatingPasswordEncoder` 格式的密码哈希（`{bcrypt}...`） |
-| role | VARCHAR(16) | NOT NULL | 账号角色枚举名称：`ADMIN`=管理员，`USER`=听众用户 |
+| role | VARCHAR(16) | NOT NULL | 账号角色枚举名称：`ADMIN`=管理员，`USER`=普通用户 |
 | status | VARCHAR(16) | NOT NULL | 账号状态枚举名称：`ACTIVE`=正常启用，`DISABLED`=停用 |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT `CURRENT_TIMESTAMP` | 创建时间（UTC 带时区时间戳） |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT `CURRENT_TIMESTAMP` | 最后更新时间（UTC 带时区时间戳） |
@@ -26,7 +26,7 @@
 
 **关系**
 
-当前表本身不持有外键。`auth_sessions.account_id` 以 `ON DELETE RESTRICT` 引用本表 `id`；后续听众资料表也将关联本表 `id`。
+当前表本身不持有外键。`auth_sessions.account_id` 以 `ON DELETE RESTRICT` 引用本表 `id`；后续用户资料表也将关联本表 `id`。
 
 **建表 SQL**
 
