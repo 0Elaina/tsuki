@@ -153,4 +153,12 @@ export const themeOverrides: GlobalThemeOverrides = {
     borderRadius: radius.small,
     heightMedium: "24px",
   },
+
+  Layout: {
+    color: palette.moon,
+    siderColor: palette.surface,
+    headerColor: palette.surface,
+    siderBorderColor: palette.border,
+    headerBorderColor: palette.border,
+  },
 };

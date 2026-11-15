@@ -7,6 +7,7 @@ declare module "vue-router" {
   interface RouteMeta {
     public?: boolean;
     title?: string;
+    activeMenu?: string;
   }
 }
 
