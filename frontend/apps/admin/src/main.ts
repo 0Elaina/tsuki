@@ -7,7 +7,7 @@ import { queryClient } from "./app/providers/query-client";
 import { router } from "./app/router";
 import "./app/styles/main.css";
 import { setupAuth } from "./app/providers/setup-auth";
-import { ROUTE_NAMES, ROUTE_PATHS } from "./shared/constants/routes.ts";
+import { ROUTE_NAMES } from "./shared/constants/routes";
 
 const app = createApp(App);
 
@@ -16,16 +16,19 @@ app.use(VueQueryPlugin, { queryClient });
 app.use(router);
 setupAuth({
   onAuthExpired: () => {
-    if (router.currentRoute.value.name === ROUTE_NAMES.LOGIN) return;
-    const currentPath = router.currentRoute.value.fullPath;
+    const currentRoute = router.currentRoute.value;
+    if (currentRoute.name === ROUTE_NAMES.LOGIN) return;
+    const isPlainHome =
+      currentRoute.name === ROUTE_NAMES.HOME &&
+      Object.keys(currentRoute.query).length === 0 &&
+      !currentRoute.hash;
     void router.replace({
       name: ROUTE_NAMES.LOGIN,
-      query:
-        currentPath === ROUTE_PATHS.HOME
-          ? undefined
-          : {
-              redirect: currentPath,
-            },
+      query: isPlainHome
+        ? undefined
+        : {
+            redirect: currentRoute.fullPath,
+          },
     });
   },
 });

@@ -1,4 +1,4 @@
-import { useAuthStore } from "@/features/auth/model/auth.store";
+import { useAuthStore } from "@/features/auth/stores/auth.store";
 import { ROUTE_NAMES, ROUTE_PATHS } from "@/shared/constants/routes";
 import type { Router } from "vue-router";
 import { resolveSafeRedirect } from "@tsuki/shared/router/safe-redirect";
@@ -12,17 +12,21 @@ export function setupRouterGuards(router: Router): void {
 
     // 未登录拦截至登录页
     if (!isPublic && !authStore.isAuthenticated) {
-      return to.fullPath === ROUTE_PATHS.HOME
+      const isPlainHome =
+        to.name === ROUTE_NAMES.HOME &&
+        Object.keys(to.query).length === 0 &&
+        !to.hash;
+      return isPlainHome
         ? { name: ROUTE_NAMES.LOGIN }
         : { name: ROUTE_NAMES.LOGIN, query: { redirect: to.fullPath } };
     }
 
     // 已登录不再退回登录页
     if (to.name === ROUTE_NAMES.LOGIN && authStore.isAuthenticated) {
-      return resolveSafeRedirect(to.query.redirect, {
-        fallback: ROUTE_PATHS.HOME,
+      const redirectPath = resolveSafeRedirect(to.query.redirect, {
         excludePaths: [ROUTE_PATHS.LOGIN],
       });
+      return redirectPath ?? { name: ROUTE_NAMES.HOME };
     }
   });
 

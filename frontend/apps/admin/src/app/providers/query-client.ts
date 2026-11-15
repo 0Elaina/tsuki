@@ -1,9 +1,7 @@
-import { ERROR_FEEDBACK } from "@/shared/api/query-meta";
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
 import {
   getErrorMessage,
   isRequestCanceled,
-  isValidationError,
   RequestError,
 } from "@tsuki/api-client";
 import type { MessageProviderInst } from "naive-ui";
@@ -13,13 +11,8 @@ export const messageProvider = shallowRef<MessageProviderInst | null>(null);
 
 export const queryClient = new QueryClient({
   mutationCache: new MutationCache({
-    onError(error, _variables, _onMutateResult, mutation) {
-      const feedback = mutation.meta?.errorFeedback;
-      if (
-        isRequestCanceled(error) ||
-        feedback === ERROR_FEEDBACK.SILENT ||
-        (feedback === ERROR_FEEDBACK.FORM && isValidationError(error))
-      ) {
+    onError(error) {
+      if (isRequestCanceled(error)) {
         return;
       }
 
