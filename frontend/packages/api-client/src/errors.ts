@@ -44,3 +44,18 @@ export const apiEnvelopeSchema = z
     errors: z.array(fieldErrorSchema),
   })
   .refine(({ data }) => data !== undefined);
+
+export function isValidationError(error: unknown): error is RequestError {
+  return error instanceof RequestError && error.code === "VALIDATION_FAILED";
+}
+
+export function isSessionInvalidError(error: unknown): error is RequestError {
+  return (
+    error instanceof RequestError &&
+    (error.code === "INVALID_REFRESH_TOKEN" || error.status === 401)
+  );
+}
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof RequestError ? error.message : fallback;
+}
