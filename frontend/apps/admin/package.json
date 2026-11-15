@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/vue-query": "^5.0.0",
     "@tsuki/api-client": "workspace:*",
+    "@tsuki/shared": "workspace:*",
     "axios": "^1.21.0",
     "lucide-vue-next": "^1.0.0",
     "naive-ui": "^2.0.0",
