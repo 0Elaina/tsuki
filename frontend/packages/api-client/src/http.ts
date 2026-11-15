@@ -180,4 +180,3 @@ export function createHttpClients(baseURL: string, timeout = 10_000) {
 
   return { publicClient, apiClient, request };
 }
-
