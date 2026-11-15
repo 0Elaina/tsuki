@@ -1,3 +1,4 @@
-import { createRequest } from "@tsuki/api-client";
+import { createHttpClients } from "@tsuki/api-client";
 
-export const request = createRequest("/api/v1");
+export const { publicClient, apiClient, request } =
+  createHttpClients("/api/v1");
