@@ -17,7 +17,7 @@ flowchart LR
     Catalog --> Postgres["PostgreSQL 项目库"]
 ```
 
-两个前端应用共用一个 pnpm workspace，各自构建，按自身业务组织页面、组件和请求逻辑；跨端复用的无框架 HTTP 客户端、响应解包、401 单飞刷新与认证契约抽离在 `packages/api-client` 中，管理端的数据维护界面与用户端的播放界面则保持独立演进，共用 workspace 管理工具链和锁文件。 [pnpm Workspace](https://pnpm.io/workspaces/)
+两个前端应用共用一个 pnpm workspace，各自构建，按自身业务组织页面、组件和请求逻辑；跨端复用的无框架 HTTP 客户端、响应解包、401 单飞刷新与认证契约抽离在 `packages/api-client` 中，跨端共享常量与安全跳转等基础工具放在 `packages/shared` 中（显式子路径导出）。管理端（`apps/admin`）采用 `app -> features -> shared` 单向依赖的 Feature-based 分层：应用壳子、导航汇总（各 feature 通过 `menu.ts` 显式声明菜单项并配合 `RouteMeta.activeMenu` 处理子页高亮）与 `403`/`404` 异常页集中在 `app/`，业务模块按 `features/<domain>/` 组织，管理端的数据维护界面与用户端的播放界面保持独立演进，共用 workspace 管理工具链和锁文件。 [pnpm Workspace](https://pnpm.io/workspaces/)
 
 ## 技术选型
 
@@ -28,7 +28,7 @@ flowchart LR
 | RustFS、S3 SDK | RustFS 保存音频和封面等文件，数据库保存对象键和业务关联。通过标准 S3 SDK 调用对象存储。 [RustFS S3 兼容矩阵](https://docs.rustfs.com/en/reference/s3-compatibility) |
 | Vue 3、TypeScript、Vite、Vue Router | Vue 负责界面，TypeScript 为组件和接口数据提供类型检查，Vite 负责开发与构建，Vue Router 管理应用内路由。 [Vue 官方脚手架](https://vuejs.org/guide/quick-start.html) |
 | Naive UI、Tailwind CSS | Naive UI 是整个前端项目（管理端与用户端）的核心组件库，交互组件、排版与反馈优先使用 Naive UI 并复用各端统一的主题配置与 `NGlobalStyle`；Tailwind CSS 负责外层页面容器定位与局部间距。 [Naive UI](https://github.com/tusen-ai/naive-ui) · [Tailwind CSS](https://tailwindcss.com/docs/installation/using-vite) |
-| TanStack Query、Pinia | TanStack Query 管理服务端数据的获取、缓存和刷新。Pinia 管理需要跨页面共享的客户端状态。 [TanStack Vue Query](https://tanstack.com/query/latest/docs/framework/vue/overview) · [Pinia](https://pinia.vuejs.org/introduction.html) |
+| TanStack Query、Pinia、VueUse | TanStack Query 管理服务端数据的获取、缓存和刷新；Pinia 管理需要跨页面共享的客户端状态；通用浏览器持久化与响应式能力优先复用 `@vueuse/core`，不重复造轮子。 [TanStack Vue Query](https://tanstack.com/query/latest/docs/framework/vue/overview) · [Pinia](https://pinia.vuejs.org/introduction.html) · [VueUse](https://vueuse.org/) |
 
 ## 中间件使用约定
 
