@@ -50,7 +50,7 @@ async function handleRetry(): Promise<void> {
 </script>
 
 <template>
-  <NFlex vertical :size="16" class="mx-auto max-w-5xl">
+  <NFlex vertical :size="12" class="w-full">
     <!-- 欢迎卡片 -->
     <NCard>
       <NFlex vertical :size="4">
@@ -100,7 +100,7 @@ async function handleRetry(): Promise<void> {
 
     <!-- 模块概览卡片 -->
     <NCard title="功能模块概览">
-      <NGrid cols="1 m:3" responsive="screen" :x-gap="16" :y-gap="16">
+      <NGrid cols="1 m:3" responsive="screen" :x-gap="12" :y-gap="12">
         <NGi v-for="item in UPCOMING_MODULES" :key="item.key">
           <NCard size="small" embedded class="h-full">
             <NFlex vertical :size="10">
