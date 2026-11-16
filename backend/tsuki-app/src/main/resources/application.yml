@@ -3,9 +3,6 @@ spring:
     name: tsuki
   profiles:
     active: dev
-  jackson:
-    deserialization:
-      accept-float-as-int: false
     datatype:
       datetime:
         write-dates-as-timestamps: false
