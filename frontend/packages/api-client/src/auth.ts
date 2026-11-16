@@ -3,11 +3,6 @@ import z from "zod";
 
 import { requestWithClient } from "./http";
 
-export const ACCOUNT_ROLES = ["ADMIN", "USER"] as const;
-
-export const accountRoleSchema = z.enum(ACCOUNT_ROLES);
-export type AccountRole = z.infer<typeof accountRoleSchema>;
-
 const csrfTokenSchema = z.object({
   token: z.string().min(1),
   headerName: z.string().min(1),
@@ -22,7 +17,7 @@ const accountIdentitySchema = z.object({
   id: z.string(),
   username: z.string(),
   nickname: z.string(),
-  role: accountRoleSchema,
+  role: z.string(),
 });
 
 export interface LoginPayload {
