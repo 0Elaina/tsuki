@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
-public record PageResult<T>(List<T> items, long page, long size, long total) {
+public record PageResult<T>(List<T> items, long page, long pageSize, long total) {
 
     public PageResult {
         items = List.copyOf(items);

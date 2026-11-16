@@ -1,6 +1,5 @@
 package com.nep.tsuki.category.model.dto;
 
-import java.text.Normalizer;
 import java.util.Objects;
 
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +11,7 @@ public record CategoryCreateRequest(
         @PositiveOrZero(message = "排序值不能为负数") Integer sortOrder) {
     public CategoryCreateRequest {
         if (name != null) {
-            name = Normalizer.normalize(name, Normalizer.Form.NFKC).strip();
+            name = name.strip();
         }
         sortOrder = Objects.requireNonNullElse(sortOrder, 0);
     }

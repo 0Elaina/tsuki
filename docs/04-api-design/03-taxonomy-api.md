@@ -9,7 +9,7 @@
 | 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | Authorization | string | header | ✅ | Bearer 认证头，格式为 `Bearer <accessToken>` |
-| name | string | body | ✅ | 分区名称，经 NFKC 规范化与去首尾空白后非空白，长度 1~64 个字符，大小写不敏感唯一 |
+| name | string | body | ✅ | 分区名称，去首尾空白后非空白，长度 1~64 个字符，大小写不敏感唯一 |
 | sortOrder | int | body | ❌ | 排序值，非负整数（`0`~`2147483647`），省略或为 `null` 时默认为 `0` |
 
 **响应示例**
@@ -81,3 +81,52 @@
 | 401 | UNAUTHENTICATED |
 | 403 | ACCESS_DENIED |
 | 404 | CATEGORY_NOT_FOUND |
+
+## GET /api/v1/admin/categories
+
+分页查询曲库分区，按 `sortOrder` 升序排列，同值按 `id` 升序排列。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| Authorization | string | header | ✅ | 管理员 Bearer Access JWT，格式为 `Bearer <accessToken>` |
+| page | int | query | ❌ | 页码，默认 `1`，最小 `1` |
+| pageSize | int | query | ❌ | 页大小，默认 `20`，范围 `1`~`100` |
+| keyword | string | query | ❌ | 分区名称关键词，去首尾空白后做大小写不敏感的包含匹配，空白时查全部名称 |
+| status | string | query | ❌ | 分区状态，`ACTIVE` 为启用，`DISABLED` 为停用。省略时查询所有状态 |
+
+**响应示例**
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": "1",
+        "name": "Indie Rock",
+        "sortOrder": 0,
+        "status": "ACTIVE",
+        "createdAt": "2026-11-16T07:00:00.123456Z",
+        "updatedAt": "2026-11-16T07:00:00.123456Z"
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "total": 1
+  },
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "errors": []
+}
+```
+
+`total` 是满足全部筛选条件的分区数。指定页无数据时，`items` 返回空数组。
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 400 | VALIDATION_FAILED |
+| 401 | UNAUTHENTICATED |
+| 403 | ACCESS_DENIED |
