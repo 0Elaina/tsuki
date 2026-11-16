@@ -31,11 +31,11 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryMapper categoryMapper;
 
     /**
-     * 创建分类
+     * 创建分区
      *
-     * @param name      分类名称
+     * @param name      分区名称
      * @param sortOrder 排序顺序
-     * @return 分类信息
+     * @return 分区信息
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -50,15 +50,15 @@ public class CategoryServiceImpl implements CategoryService {
         } catch (DuplicateKeyException ex) {
             throw new BusinessException(CategoryApiCode.CATEGORY_NAME_CONFLICT);
         }
-        log.info("创建分类成功: id={}, name={}", category.getId(), category.getName());
+        log.info("创建分区成功: id={}, name={}", category.getId(), category.getName());
         return CategoryResponse.of(category);
     }
 
     /**
-     * 根据ID查询分类
+     * 根据ID查询分区
      *
-     * @param id 分类ID
-     * @return 分类信息
+     * @param id 分区ID
+     * @return 分区信息
      */
     @Override
     public CategoryResponse findById(Long id) {
@@ -70,10 +70,10 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     /**
-     * 查询分类列表
+     * 查询分区列表
      *
      * @param query 查询参数
-     * @return 分类列表
+     * @return 分区列表
      */
     @Override
     public PageResult<CategoryResponse> list(CategoryQuery query) {
@@ -89,5 +89,73 @@ public class CategoryServiceImpl implements CategoryService {
         }
         categoryMapper.selectPage(page, wrapper.orderByAsc(Category::getSortOrder).orderByAsc(Category::getId));
         return PageResult.from(page.convert(CategoryResponse::of));
+    }
+
+    /**
+     * 更新分区
+     *
+     * @param id        分区ID
+     * @param name      分区名称
+     * @param sortOrder 排序顺序
+     * @return 分区信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CategoryResponse update(Long id, String name, Integer sortOrder) {
+        Category category = new Category();
+        category.setId(id);
+        category.setName(name);
+        category.setSortOrder(sortOrder);
+
+        int updated;
+        try {
+            updated = categoryMapper.updateById(category);
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException(CategoryApiCode.CATEGORY_NAME_CONFLICT);
+        }
+
+        if (updated == 0) {
+            throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND);
+        }
+
+        log.info("更新分区成功: id={}, name={}", category.getId(), category.getName());
+        return findById(id);
+    }
+
+    /**
+     * 更新分区状态
+     *
+     * @param id     分区ID
+     * @param status 分区状态
+     * @return 分区信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CategoryResponse updateStatus(Long id, CategoryStatus status) {
+        Category category = new Category();
+        category.setId(id);
+        category.setStatus(status.name());
+
+        int updated = categoryMapper.updateById(category);
+        if (updated == 0) {
+            throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND);
+        }
+        log.info("更新分区状态成功: id={}, status={}", category.getId(), category.getStatus());
+        return findById(id);
+    }
+
+    /**
+     * 删除分区
+     *
+     * @param id 分区ID
+     */
+    @Override
+    public void delete(Long id) {
+        int deleted = categoryMapper.deleteById(id);
+        if (deleted == 0) {
+            log.warn("目标分区不存在, 幂等成功, id={}", id);
+            return;
+        }
+        log.info("删除目标分区成功, id={}", id);
     }
 }

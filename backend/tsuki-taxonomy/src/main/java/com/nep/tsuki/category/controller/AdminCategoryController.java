@@ -3,10 +3,13 @@ package com.nep.tsuki.category.controller;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -16,6 +19,8 @@ import com.nep.tsuki.api.ApiResponse;
 import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.category.model.dto.CategoryCreateRequest;
 import com.nep.tsuki.category.model.dto.CategoryQuery;
+import com.nep.tsuki.category.model.dto.CategoryStatusUpdateRequest;
+import com.nep.tsuki.category.model.dto.CategoryUpdateRequest;
 import com.nep.tsuki.category.model.vo.CategoryResponse;
 import com.nep.tsuki.category.service.CategoryService;
 
@@ -70,5 +75,46 @@ public class AdminCategoryController {
     public ApiResponse<PageResult<CategoryResponse>> list(
             @ParameterObject @Valid @ModelAttribute CategoryQuery query) {
         return ApiResponse.success(categoryService.list(query));
+    }
+
+    /**
+     * 编辑分区
+     *
+     * @param id      分区 ID
+     * @param request 编辑请求
+     * @return 编辑后的分区信息
+     */
+    @Operation(summary = "编辑分区")
+    @PatchMapping("/{id}")
+    public ApiResponse<CategoryResponse> update(@PathVariable @Positive(message = "分区 ID 必须为正整数") Long id,
+            @Valid @RequestBody CategoryUpdateRequest request) {
+        return ApiResponse.success(categoryService.update(id, request.name(), request.sortOrder()));
+    }
+
+    /**
+     * 更新分区状态
+     *
+     * @param id      分区 ID
+     * @param request 更新请求
+     * @return 更新的分区信息
+     */
+    @Operation(summary = "更新分区状态")
+    @PutMapping("/{id}/status")
+    public ApiResponse<CategoryResponse> updateStatus(@PathVariable @Positive(message = "分区 ID 必须为正整数") Long id,
+            @Valid @RequestBody CategoryStatusUpdateRequest request) {
+        return ApiResponse.success(categoryService.updateStatus(id, request.status()));
+    }
+
+    /**
+     * 删除分区
+     *
+     * @param id 分区 ID
+     * @return 删除结果
+     */
+    @Operation(summary = "删除分区")
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable @Positive(message = "分区 ID 必须为正整数") Long id) {
+        categoryService.delete(id);
+        return ApiResponse.success();
     }
 }
