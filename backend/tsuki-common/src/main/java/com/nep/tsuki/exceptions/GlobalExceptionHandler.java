@@ -24,6 +24,10 @@ import com.nep.tsuki.api.ApiCode;
 import com.nep.tsuki.api.ApiResponse;
 import com.nep.tsuki.api.FieldError;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.ElementKind;
+import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -38,6 +42,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ApiCode code = exception.getApiCode();
         String message = Objects.requireNonNullElse(exception.getMessage(), code.message());
         return ResponseEntity.status(code.httpStatus()).body(ApiResponse.error(code, message));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(
+            ConstraintViolationException exception) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
+            String field = extractField(violation);
+            errors.putIfAbsent(field, Objects.requireNonNullElse(violation.getMessage(), DEFAULT_VALIDATION_MESSAGE));
+        }
+        return ResponseEntity.status(ApiCode.VALIDATION_FAILED.httpStatus()).body(validationError(errors));
     }
 
     @ExceptionHandler(Exception.class)
@@ -107,6 +122,34 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             }
             errors.putIfAbsent(field, Objects.requireNonNullElse(message, DEFAULT_VALIDATION_MESSAGE));
         }
+    }
+
+    private static String extractField(ConstraintViolation<?> violation) {
+        String parameterName = null;
+        StringBuilder propertyPath = new StringBuilder();
+        ElementKind lastKind = null;
+        for (Path.Node node : violation.getPropertyPath()) {
+            lastKind = node.getKind();
+            if (lastKind == ElementKind.PARAMETER) {
+                parameterName = node.getName();
+            } else if (lastKind == ElementKind.PROPERTY) {
+                if (!propertyPath.isEmpty()) {
+                    propertyPath.append('.');
+                }
+                propertyPath.append(node.getName());
+                if (node.isInIterable()) {
+                    if (node.getIndex() != null) {
+                        propertyPath.append('[').append(node.getIndex()).append(']');
+                    } else if (node.getKey() != null) {
+                        propertyPath.append('[').append(node.getKey()).append(']');
+                    }
+                }
+            }
+        }
+        if (lastKind == ElementKind.CROSS_PARAMETER || lastKind == ElementKind.BEAN) {
+            return null;
+        }
+        return !propertyPath.isEmpty() ? propertyPath.toString() : parameterName;
     }
 
     private static ApiResponse<Void> validationError(Map<String, String> errors) {

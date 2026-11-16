@@ -42,3 +42,5 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 | 401 | `INVALID_REFRESH_TOKEN` | 刷新令牌无效或已过期 | `tsuki-auth` |
 | 429 | `LOGIN_RATE_LIMITED` | 登录请求过于频繁, 请稍候重试 | `tsuki-auth` |
 | 503 | `LOGIN_UNAVAILABLE` | 登录服务暂时不可用, 请稍后再试 | `tsuki-auth` |
+| 409 | `CATEGORY_NAME_CONFLICT` | 分区名称已存在 | `tsuki-taxonomy` |
+| 404 | `CATEGORY_NOT_FOUND` | 分区不存在 | `tsuki-taxonomy` |

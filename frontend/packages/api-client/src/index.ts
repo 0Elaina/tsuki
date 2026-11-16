@@ -1,9 +1,6 @@
 export {
-  ACCOUNT_ROLES,
-  accountRoleSchema,
   createAuthApi,
   type AccountIdentity,
-  type AccountRole,
   type AuthApiOptions,
   type LoginPayload,
   type LoginResponse,

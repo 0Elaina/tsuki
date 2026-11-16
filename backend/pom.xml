@@ -18,6 +18,7 @@
 		<module>tsuki-common</module>
 		<module>tsuki-user</module>
 		<module>tsuki-auth</module>
+		<module>tsuki-taxonomy</module>
 	</modules>
 	<name>tsuki-parent</name>
 
@@ -43,6 +44,11 @@
 			<dependency>
 				<groupId>com.nep.tsuki</groupId>
 				<artifactId>tsuki-auth</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.nep.tsuki</groupId>
+				<artifactId>tsuki-taxonomy</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
