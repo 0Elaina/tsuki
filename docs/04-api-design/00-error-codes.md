@@ -25,7 +25,7 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
   "message": "请求参数校验失败",
   "errors": [
     {
-      "field": "size",
+      "field": "pageSize",
       "message": "页大小不能超过 100"
     }
   ]
@@ -44,3 +44,5 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 | 503 | `LOGIN_UNAVAILABLE` | 登录服务暂时不可用, 请稍后再试 | `tsuki-auth` |
 | 409 | `CATEGORY_NAME_CONFLICT` | 分区名称已存在 | `tsuki-taxonomy` |
 | 404 | `CATEGORY_NOT_FOUND` | 分区不存在 | `tsuki-taxonomy` |
+| 409 | `TAG_NAME_CONFLICT` | 标签名称已存在 | `tsuki-taxonomy` |
+| 404 | `TAG_NOT_FOUND` | 标签不存在 | `tsuki-taxonomy` |
