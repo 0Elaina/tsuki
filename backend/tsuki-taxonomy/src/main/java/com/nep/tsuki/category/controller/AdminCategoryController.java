@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nep.tsuki.api.ApiResponse;
 import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.category.model.dto.CategoryBatchDeleteRequest;
+import com.nep.tsuki.category.model.dto.CategoryBatchStatusUpdateRequest;
 import com.nep.tsuki.category.model.dto.CategoryCreateRequest;
 import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.dto.CategoryStatusUpdateRequest;
@@ -116,5 +118,31 @@ public class AdminCategoryController {
     public ApiResponse<Void> delete(@PathVariable @Positive(message = "分区 ID 必须为正整数") Long id) {
         categoryService.delete(id);
         return ApiResponse.success();
+    }
+
+    /**
+     * 批量更新分区状态
+     *
+     * @param request 批量更新请求
+     * @return 更新的数量
+     */
+    @Operation(summary = "批量更新分区状态")
+    @PostMapping("/batch-status")
+    public ApiResponse<Integer> batchUpdateStatus(
+            @Valid @RequestBody CategoryBatchStatusUpdateRequest request) {
+        return ApiResponse.success(categoryService.batchUpdateStatus(request.ids(), request.status()));
+    }
+
+    /**
+     * 批量删除分区
+     *
+     * @param request 批量删除请求
+     * @return 删除的数量
+     */
+    @Operation(summary = "批量删除分区")
+    @PostMapping("/batch-delete")
+    public ApiResponse<Integer> batchDelete(
+            @Valid @RequestBody CategoryBatchDeleteRequest request) {
+        return ApiResponse.success(categoryService.batchDelete(request.ids()));
     }
 }

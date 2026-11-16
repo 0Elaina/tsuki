@@ -1,5 +1,7 @@
 package com.nep.tsuki.category.service;
 
+import java.util.List;
+
 import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.enums.CategoryStatus;
@@ -42,7 +44,7 @@ public interface CategoryService {
     CategoryResponse update(Long id, String name, Integer sortOrder);
 
     /**
-     * 更新分类状态
+     * 更新分区状态
      *
      * @param id     分区ID
      * @param status 分区状态
@@ -56,4 +58,21 @@ public interface CategoryService {
      * @param id 分区ID
      */
     void delete(Long id);
+
+    /**
+     * 批量更新分区状态
+     *
+     * @param ids    分区ID列表
+     * @param status 分区状态
+     * @return 影响行数
+     */
+    int batchUpdateStatus(List<Long> ids, CategoryStatus status);
+
+    /**
+     * 批量删除分区
+     *
+     * @param ids 分区ID列表
+     * @return 影响行数
+     */
+    int batchDelete(List<Long> ids);
 }
