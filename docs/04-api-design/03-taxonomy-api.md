@@ -246,3 +246,71 @@
 | 400 | VALIDATION_FAILED |
 | 401 | UNAUTHENTICATED |
 | 403 | ACCESS_DENIED |
+
+## POST /api/v1/admin/categories/batch-status
+
+校验管理端 Bearer Access JWT（`ROLE_ADMIN`），校验全部目标存在后批量切换分区状态（跳过已处于目标状态的记录），返回实际变更行数。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| Authorization | string | header | ✅ | Bearer 认证头，格式为 `Bearer <accessToken>` |
+| ids | long[] | body | ✅ | 分区 ID 数组，去重前长度 `1`~`100`，元素均为正整数（兼容数字或十进制数字字符串） |
+| status | string | body | ✅ | 目标状态，取值：`ACTIVE`=启用，`DISABLED`=停用 |
+
+**响应示例**
+
+```json
+{
+  "data": 2,
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "errors": []
+}
+```
+
+`data` 为本次实际切换状态的行数；已处于目标状态的记录保留原 `updatedAt` 且不计入行数。
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 400 | BAD_REQUEST |
+| 400 | VALIDATION_FAILED |
+| 401 | UNAUTHENTICATED |
+| 403 | ACCESS_DENIED |
+| 404 | CATEGORY_NOT_FOUND |
+
+## POST /api/v1/admin/categories/batch-delete
+
+校验管理端 Bearer Access JWT（`ROLE_ADMIN`），按主键集合幂等批量删除分区（启用与停用状态均可删除，缺失 ID 不报错），返回实际删除行数。
+
+**请求参数**
+
+| 字段 | 类型 | 位置(body/query/path/header) | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| Authorization | string | header | ✅ | Bearer 认证头，格式为 `Bearer <accessToken>` |
+| ids | long[] | body | ✅ | 分区 ID 数组，去重前长度 `1`~`100`，元素均为正整数（兼容数字或十进制数字字符串） |
+
+**响应示例**
+
+```json
+{
+  "data": 2,
+  "code": "SUCCESS",
+  "message": "响应成功",
+  "errors": []
+}
+```
+
+`data` 为本次实际删除的行数；已不存在的 ID 不计入行数，全部已删除时返回 `0`。
+
+**错误码**
+
+| 状态码 | 错误码 |
+| --- | --- |
+| 400 | BAD_REQUEST |
+| 400 | VALIDATION_FAILED |
+| 401 | UNAUTHENTICATED |
+| 403 | ACCESS_DENIED |
