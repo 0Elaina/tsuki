@@ -16,6 +16,12 @@ spring:
       port: "${TSUKI_REDIS_PORT:6379}"
       password: "${TSUKI_REDIS_PASSWORD:}"
 
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
 logging:
   file:
     name: "${TSUKI_LOG_FILE:logs/tsuki.log}"
