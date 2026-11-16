@@ -1,5 +1,7 @@
 package com.nep.tsuki.tag.service;
 
+import java.util.List;
+
 import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.tag.model.dto.TagQuery;
 import com.nep.tsuki.tag.model.enums.TagStatus;
@@ -56,4 +58,21 @@ public interface TagService {
      * @param id 标签 ID
      */
     void delete(Long id);
+
+    /**
+     * 批量更新标签状态
+     *
+     * @param ids    标签 ID 列表
+     * @param status 标签状态
+     * @return 影响行数
+     */
+    int batchUpdateStatus(List<Long> ids, TagStatus status);
+
+    /**
+     * 批量删除标签
+     *
+     * @param ids 标签 ID 列表
+     * @return 影响行数
+     */
+    int batchDelete(List<Long> ids);
 }

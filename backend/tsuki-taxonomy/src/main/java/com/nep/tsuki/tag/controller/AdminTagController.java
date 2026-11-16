@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nep.tsuki.api.ApiResponse;
 import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.tag.model.dto.TagBatchDeleteRequest;
+import com.nep.tsuki.tag.model.dto.TagBatchStatusUpdateRequest;
 import com.nep.tsuki.tag.model.dto.TagCreateRequest;
 import com.nep.tsuki.tag.model.dto.TagQuery;
 import com.nep.tsuki.tag.model.dto.TagStatusUpdateRequest;
@@ -115,5 +117,31 @@ public class AdminTagController {
     public ApiResponse<Void> delete(@PathVariable @Positive(message = "标签 ID 必须为正整数") Long id) {
         tagService.delete(id);
         return ApiResponse.success();
+    }
+
+    /**
+     * 批量更新标签状态
+     *
+     * @param request 批量更新请求
+     * @return 更新的数量
+     */
+    @Operation(summary = "批量更新标签状态")
+    @PostMapping("/batch-status")
+    public ApiResponse<Integer> batchUpdateStatus(
+            @Valid @RequestBody TagBatchStatusUpdateRequest request) {
+        return ApiResponse.success(tagService.batchUpdateStatus(request.ids(), request.status()));
+    }
+
+    /**
+     * 批量删除标签
+     *
+     * @param request 批量删除请求
+     * @return 删除的数量
+     */
+    @Operation(summary = "批量删除标签")
+    @PostMapping("/batch-delete")
+    public ApiResponse<Integer> batchDelete(
+            @Valid @RequestBody TagBatchDeleteRequest request) {
+        return ApiResponse.success(tagService.batchDelete(request.ids()));
     }
 }

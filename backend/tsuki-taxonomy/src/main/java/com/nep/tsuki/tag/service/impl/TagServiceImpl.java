@@ -1,5 +1,8 @@
 package com.nep.tsuki.tag.service.impl;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -9,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.exceptions.BusinessException;
@@ -157,5 +161,55 @@ public class TagServiceImpl implements TagService {
             return;
         }
         log.info("删除目标标签成功, id={}", id);
+    }
+
+    /**
+     * 批量更新标签状态
+     *
+     * @param ids    标签 ID 列表
+     * @param status 标签状态
+     * @return 影响行数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int batchUpdateStatus(List<Long> ids, TagStatus status) {
+        List<Long> distinctIds = ids.stream().distinct().toList();
+        List<Tag> tags = tagMapper.selectByIdsForUpdate(distinctIds);
+
+        if (tags.size() != distinctIds.size()) {
+            throw new BusinessException(TagApiCode.TAG_NOT_FOUND, "部分标签不存在，请刷新列表后重试");
+        }
+
+        List<Long> needUpdateIds = tags.stream()
+                .filter(tag -> !status.name().equals(tag.getStatus()))
+                .map(Tag::getId)
+                .toList();
+        if (needUpdateIds.isEmpty()) {
+            log.debug("没有需要更新的标签, 跳过更新, ids={}", ids);
+            return 0;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        int updatedCount = tagMapper.update(null, new LambdaUpdateWrapper<Tag>()
+                .in(Tag::getId, needUpdateIds)
+                .set(Tag::getStatus, status.name())
+                .set(Tag::getUpdatedAt, now));
+        log.info("批量更新标签状态成功, targetStatus={}, idsCount={}, updatedCount={}", status, ids.size(), updatedCount);
+        return updatedCount;
+    }
+
+    /**
+     * 批量删除标签
+     *
+     * @param ids 标签 ID 列表
+     * @return 影响行数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int batchDelete(List<Long> ids) {
+        List<Long> distinctIds = ids.stream().distinct().toList();
+        int deletedCount = tagMapper.deleteByIds(distinctIds);
+        log.info("批量删除标签成功, idsCount={}, deletedCount={}", ids.size(), deletedCount);
+        return deletedCount;
     }
 }
