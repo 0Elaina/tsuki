@@ -1,5 +1,7 @@
 package com.nep.tsuki.category.service;
 
+import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.vo.CategoryResponse;
 
 public interface CategoryService {
@@ -19,4 +21,12 @@ public interface CategoryService {
      * @return 分类信息
      */
     CategoryResponse findById(Long id);
+
+    /**
+     * 查询分类列表
+     *
+     * @param query 查询参数
+     * @return 分类列表
+     */
+    PageResult<CategoryResponse> list(CategoryQuery query);
 }

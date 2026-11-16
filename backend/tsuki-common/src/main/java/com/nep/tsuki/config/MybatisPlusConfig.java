@@ -11,7 +11,7 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
-import com.nep.tsuki.api.PageQuery;
+import com.nep.tsuki.constants.PageConstants;
 
 @Configuration(proxyBeanMethods = false)
 public class MybatisPlusConfig {
@@ -20,7 +20,7 @@ public class MybatisPlusConfig {
     MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor mybatisPlusInterceptor = new MybatisPlusInterceptor();
         PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor(DbType.POSTGRE_SQL);
-        paginationInnerInterceptor.setMaxLimit((long) PageQuery.MAX_PAGE_SIZE);
+        paginationInnerInterceptor.setMaxLimit((long) PageConstants.MAX_PAGE_SIZE);
         mybatisPlusInterceptor.addInnerInterceptor(paginationInnerInterceptor);
         return mybatisPlusInterceptor;
     }

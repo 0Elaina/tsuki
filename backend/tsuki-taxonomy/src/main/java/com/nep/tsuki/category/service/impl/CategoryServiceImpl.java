@@ -1,18 +1,25 @@
 package com.nep.tsuki.category.service.impl;
 
+import java.util.Locale;
 import java.util.Objects;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.category.constants.CategoryApiCode;
 import com.nep.tsuki.category.mapper.CategoryMapper;
+import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.entity.Category;
 import com.nep.tsuki.category.model.enums.CategoryStatus;
 import com.nep.tsuki.category.model.vo.CategoryResponse;
 import com.nep.tsuki.category.service.CategoryService;
 import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.utils.SqlUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,5 +67,27 @@ public class CategoryServiceImpl implements CategoryService {
             throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND);
         }
         return CategoryResponse.of(category);
+    }
+
+    /**
+     * 查询分类列表
+     *
+     * @param query 查询参数
+     * @return 分类列表
+     */
+    @Override
+    public PageResult<CategoryResponse> list(CategoryQuery query) {
+        Page<Category> page = query.toPage();
+
+        LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
+        if (query.getStatus() != null) {
+            wrapper.eq(Category::getStatus, query.getStatus().name());
+        }
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.apply("LOWER(name) LIKE {0} ESCAPE '!'",
+                    SqlUtils.toContainsLikePattern(query.getKeyword().strip().toLowerCase(Locale.ROOT)));
+        }
+        categoryMapper.selectPage(page, wrapper.orderByAsc(Category::getSortOrder).orderByAsc(Category::getId));
+        return PageResult.from(page.convert(CategoryResponse::of));
     }
 }

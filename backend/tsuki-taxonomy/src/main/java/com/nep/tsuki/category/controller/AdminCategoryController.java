@@ -1,8 +1,10 @@
 package com.nep.tsuki.category.controller;
 
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -11,7 +13,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nep.tsuki.api.ApiResponse;
+import com.nep.tsuki.api.PageResult;
 import com.nep.tsuki.category.model.dto.CategoryCreateRequest;
+import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.vo.CategoryResponse;
 import com.nep.tsuki.category.service.CategoryService;
 
@@ -53,5 +57,18 @@ public class AdminCategoryController {
     @GetMapping("/{id}")
     public ApiResponse<CategoryResponse> findById(@PathVariable @Positive(message = "分区 ID 必须为正整数") Long id) {
         return ApiResponse.success(categoryService.findById(id));
+    }
+
+    /**
+     * 分页查询分区列表
+     *
+     * @param query 查询参数
+     * @return 分页查询结果
+     */
+    @Operation(summary = "分页查询分区列表")
+    @GetMapping
+    public ApiResponse<PageResult<CategoryResponse>> list(
+            @ParameterObject @Valid @ModelAttribute CategoryQuery query) {
+        return ApiResponse.success(categoryService.list(query));
     }
 }
