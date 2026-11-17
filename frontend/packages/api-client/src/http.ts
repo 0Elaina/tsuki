@@ -5,7 +5,7 @@ import type {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
-import type z from "zod";
+import z from "zod";
 
 import { apiEnvelopeSchema, isRequestCanceled, RequestError } from "./errors";
 
@@ -19,6 +19,17 @@ export interface PageResult<T> {
   page: number;
   pageSize: number;
   total: number;
+}
+
+export function createPageResultSchema<T extends z.ZodType>(
+  itemSchema: T,
+): z.ZodType<PageResult<z.infer<T>>> {
+  return z.object({
+    items: z.array(itemSchema),
+    page: z.number().int(),
+    pageSize: z.number().int(),
+    total: z.number().int(),
+  });
 }
 
 export interface RequestConfig<
