@@ -12,10 +12,10 @@ import com.nep.tsuki.category.model.entity.Category;
 public interface CategoryMapper extends BaseMapper<Category> {
 
     /**
-     * 根据 ID 批量查询分区并加锁
+     * 根据 ID 批量查询分类并加锁
      *
      * @param ids id列表
-     * @return 分区列表
+     * @return 分类列表
      */
     List<Category> selectByIdsForUpdate(@Param("ids") List<Long> ids);
 }

@@ -8,7 +8,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public record CategoryUpdateRequest(
-        @NotBlank(message = "分区名称不能为空") @Size(max = CategoryValidationConstants.NAME_MAX_LENGTH, message = "分区名称不能超过64个字符") String name,
+        @NotBlank(message = "分类名称不能为空") @Size(max = CategoryValidationConstants.NAME_MAX_LENGTH, message = "分类名称不能超过64个字符") String name,
         @NotNull(message = "排序值不能为空") @PositiveOrZero(message = "排序值不能为负数") Integer sortOrder) {
     public CategoryUpdateRequest {
         if (name != null) {
