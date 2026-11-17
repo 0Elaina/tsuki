@@ -8,7 +8,9 @@
     "./constants/auth": "./src/constants/auth.ts",
     "./constants/pagination": "./src/constants/pagination.ts",
     "./constants/number": "./src/constants/number.ts",
-    "./utils/number": "./src/utils/number.ts"
+    "./constants/time": "./src/constants/time.ts",
+    "./utils/number": "./src/utils/number.ts",
+    "./utils/time": "./src/utils/time.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
