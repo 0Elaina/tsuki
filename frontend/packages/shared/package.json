@@ -7,7 +7,8 @@
     "./router/safe-redirect": "./src/router/safe-redirect.ts",
     "./constants/auth": "./src/constants/auth.ts",
     "./constants/pagination": "./src/constants/pagination.ts",
-    "./constants/number": "./src/constants/number.ts"
+    "./constants/number": "./src/constants/number.ts",
+    "./utils/number": "./src/utils/number.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
