@@ -17,14 +17,10 @@ export function useCategoryBatchActions() {
   const batchDeleteMutation = useBatchDeleteCategoryMutation();
 
   const selectedIds = computed(() => checkedRowKeys.value.map(String));
-  const batchStatusPending = computed(
-    () => batchStatusMutation.isPending.value,
-  );
-  const batchDeletePending = computed(
-    () => batchDeleteMutation.isPending.value,
-  );
   const batchPending = computed(
-    () => batchStatusPending.value || batchDeletePending.value,
+    () =>
+      batchStatusMutation.isPending.value ||
+      batchDeleteMutation.isPending.value,
   );
 
   function removeSelectedKey(id: string): void {
@@ -96,8 +92,6 @@ export function useCategoryBatchActions() {
     checkedRowKeys,
     selectedIds,
     batchPending,
-    batchStatusPending,
-    batchDeletePending,
     removeSelectedKey,
     handleClearSelection,
     handleBatchStatus,

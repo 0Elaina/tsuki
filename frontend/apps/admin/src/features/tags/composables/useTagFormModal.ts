@@ -11,27 +11,26 @@ export function useTagFormModal() {
   const modalVisible = ref(false);
   const editingTag = shallowRef<TagItem | null>(null);
 
-  const createTagMutation = useCreateTagMutation();
-  const updateTagMutation = useUpdateTagMutation();
+  const createMutation = useCreateTagMutation();
+  const updateMutation = useUpdateTagMutation();
 
   const formSubmitting = computed(
-    () =>
-      createTagMutation.isPending.value || updateTagMutation.isPending.value,
+    () => createMutation.isPending.value || updateMutation.isPending.value,
   );
 
-  function openCreateTagModal(): void {
+  function openCreateModal(): void {
     editingTag.value = null;
     modalVisible.value = true;
   }
 
-  function openEditTagModal(row: TagItem): void {
+  function openEditModal(row: TagItem): void {
     editingTag.value = row;
     modalVisible.value = true;
   }
 
   function handleModalSubmit(payload: UpdateTagPayload): void {
     if (editingTag.value) {
-      updateTagMutation.mutate(
+      updateMutation.mutate(
         {
           id: editingTag.value.id,
           data: payload,
@@ -44,7 +43,7 @@ export function useTagFormModal() {
         },
       );
     } else {
-      createTagMutation.mutate(payload, {
+      createMutation.mutate(payload, {
         onSuccess: () => {
           modalVisible.value = false;
           message.success("标签创建成功");
@@ -57,8 +56,8 @@ export function useTagFormModal() {
     modalVisible,
     editingTag,
     formSubmitting,
-    openCreateTagModal,
-    openEditTagModal,
+    openCreateModal,
+    openEditModal,
     handleModalSubmit,
   };
 }

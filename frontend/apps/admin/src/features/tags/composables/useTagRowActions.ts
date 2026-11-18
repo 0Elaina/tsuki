@@ -15,8 +15,8 @@ export function useTagRowActions(options: UseTagRowActionsOptions = {}) {
   const togglingId = ref<string | null>(null);
   const deletingId = ref<string | null>(null);
 
-  const updateTagStatusMutation = useUpdateTagStatusMutation();
-  const deleteTagMutation = useDeleteTagMutation();
+  const updateStatusMutation = useUpdateTagStatusMutation();
+  const deleteMutation = useDeleteTagMutation();
 
   function handleToggleStatus(row: TagItem): void {
     const nextStatus =
@@ -25,7 +25,7 @@ export function useTagRowActions(options: UseTagRowActionsOptions = {}) {
         : TAG_STATUS.ACTIVE;
     togglingId.value = row.id;
 
-    updateTagStatusMutation.mutate(
+    updateStatusMutation.mutate(
       {
         id: row.id,
         status: nextStatus,
@@ -45,7 +45,7 @@ export function useTagRowActions(options: UseTagRowActionsOptions = {}) {
 
   function handleDelete(id: string): void {
     deletingId.value = id;
-    deleteTagMutation.mutate(id, {
+    deleteMutation.mutate(id, {
       onSuccess: () => {
         options.onDeleted?.(id);
         message.success("标签已删除");

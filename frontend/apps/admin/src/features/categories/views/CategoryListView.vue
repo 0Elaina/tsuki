@@ -73,8 +73,6 @@ const {
   checkedRowKeys,
   selectedIds,
   batchPending,
-  batchStatusPending,
-  batchDeletePending,
   removeSelectedKey,
   handleClearSelection,
   handleBatchStatus,
@@ -176,8 +174,6 @@ async function handleRetry(): Promise<void> {
         <CategoryBatchBar
           :count="selectedIds.length"
           :batch-pending="batchPending"
-          :batch-status-pending="batchStatusPending"
-          :batch-delete-pending="batchDeletePending"
           @batch-status="handleBatchStatus"
           @batch-delete="handleBatchDelete"
           @clear="handleClearSelection"

@@ -46,8 +46,8 @@ const {
   modalVisible,
   editingTag,
   formSubmitting,
-  openCreateTagModal,
-  openEditTagModal,
+  openCreateModal,
+  openEditModal,
   handleModalSubmit,
 } = useTagFormModal();
 const { togglingId, deletingId, handleToggleStatus, handleDelete } =
@@ -99,7 +99,7 @@ async function handleRetry(): Promise<void> {
       </template>
 
       <template #header-extra>
-        <NButton type="primary" @click="openCreateTagModal">
+        <NButton type="primary" @click="openCreateModal">
           <template #icon>
             <NIcon :component="Plus" />
           </template>
@@ -169,7 +169,7 @@ async function handleRetry(): Promise<void> {
           "
           :pagination="pagination"
           :has-active-filters="hasActiveFilters"
-          @edit="openEditTagModal"
+          @edit="openEditModal"
           @toggle-status="handleToggleStatus"
           @delete="handleDelete"
           @retry="handleRetry"
