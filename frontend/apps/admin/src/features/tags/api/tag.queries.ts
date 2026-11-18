@@ -12,6 +12,6 @@ export function tagListQueryOptions(params: MaybeRefOrGetter<TagListQuery>) {
   });
 }
 
-export function useTagQuery(params: MaybeRefOrGetter<TagListQuery>) {
+export function useTagListQuery(params: MaybeRefOrGetter<TagListQuery>) {
   return useQuery(tagListQueryOptions(params));
 }

@@ -4,6 +4,7 @@ import { authRoutes } from "@/features/auth/routes";
 import { dashboardRoutes } from "@/features/dashboard/routes";
 import { ROUTE_NAMES, ROUTE_PATHS } from "@/shared/constants/routes";
 import { categoryRoutes } from "@/features/categories/routes";
+import { tagRoutes } from "@/features/tags/routes";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -32,6 +33,7 @@ export const router = createRouter({
       children: [
         ...dashboardRoutes,
         ...categoryRoutes,
+        ...tagRoutes,
         {
           name: ROUTE_NAMES.NOT_FOUND,
           path: ROUTE_PATHS.NOT_FOUND,
