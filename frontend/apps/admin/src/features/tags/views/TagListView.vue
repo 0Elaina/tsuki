@@ -15,9 +15,12 @@ import { usePagination } from "@/shared/composables/usePagination";
 import { useTagFilters } from "../composables/useTagFilters";
 import { computed, watch } from "vue";
 import { useTagListQuery } from "../api/tag.queries";
-import { RotateCcw, Search } from "lucide-vue-next";
+import { Plus, RotateCcw, Search } from "lucide-vue-next";
 import TagTable from "../components/TagTable.vue";
 import { getErrorMessage } from "@tsuki/api-client";
+import { useTagFormModal } from "../composables/useTagFormModal";
+import { useTagRowActions } from "../composables/useTagRowActions";
+import TagFormModal from "../components/TagFormModal.vue";
 
 const STATUS_OPTIONS: SelectOption[] = [
   {
@@ -39,6 +42,16 @@ const {
   handleSearch,
   handleReset,
 } = useTagFilters(pageSize);
+const {
+  modalVisible,
+  editingTag,
+  formSubmitting,
+  openCreateTagModal,
+  openEditTagModal,
+  handleModalSubmit,
+} = useTagFormModal();
+const { togglingId, deletingId, handleToggleStatus, handleDelete } =
+  useTagRowActions();
 
 const queryParams = computed(() => ({
   page: page.value,
@@ -83,6 +96,15 @@ async function handleRetry(): Promise<void> {
             维护曲库音乐标签、排序权重和启停状态
           </NText>
         </NFlex>
+      </template>
+
+      <template #header-extra>
+        <NButton type="primary" @click="openCreateTagModal">
+          <template #icon>
+            <NIcon :component="Plus" />
+          </template>
+          新建标签
+        </NButton>
       </template>
 
       <!-- 主体 -->
@@ -134,9 +156,11 @@ async function handleRetry(): Promise<void> {
         <!-- 数据表格 -->
         <TagTable
           :items="tagListItems"
+          :toggling-id="togglingId"
+          :deleting-id="deletingId"
           :loading="tagListQuery.isLoading.value"
-          :fetching="tagListQuery.isFetching.value"
           :is-error="tagListQuery.isLoadingError.value"
+          :fetching="tagListQuery.isFetching.value"
           :error-message="
             getErrorMessage(
               tagListQuery.error.value,
@@ -145,9 +169,18 @@ async function handleRetry(): Promise<void> {
           "
           :pagination="pagination"
           :has-active-filters="hasActiveFilters"
+          @edit="openEditTagModal"
+          @toggle-status="handleToggleStatus"
+          @delete="handleDelete"
           @retry="handleRetry"
         />
       </div>
     </NCard>
+    <TagFormModal
+      v-model:show="modalVisible"
+      :tag="editingTag"
+      :submitting="formSubmitting"
+      @submit="handleModalSubmit"
+    />
   </div>
 </template>
