@@ -18,7 +18,7 @@ withDefaults(
   },
 );
 
-const emit = defineEmits<{
+const emits = defineEmits<{
   retry: [];
 }>();
 </script>
@@ -27,7 +27,7 @@ const emit = defineEmits<{
   <NFlex justify="center" align="center" class="min-h-40 py-8">
     <NResult status="error" :title="title" :description="description">
       <template v-if="showRetry" #footer>
-        <NButton :loading="retrying" @click="emit('retry')">{{
+        <NButton :loading="retrying" @click="emits('retry')">{{
           retryText
         }}</NButton>
       </template>

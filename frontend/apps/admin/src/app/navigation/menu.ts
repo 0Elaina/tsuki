@@ -1,5 +1,6 @@
 import { categoryMenus } from "@/features/categories/menu";
 import { dashboardMenus } from "@/features/dashboard/menu";
+import { tagMenus } from "@/features/tags/menu";
 import { ROUTE_NAMES } from "@/shared/constants/routes";
 import { renderIcon } from "@/shared/utils/icon";
 import { Tags } from "lucide-vue-next";
@@ -20,7 +21,7 @@ export const adminMenuOptions: MenuOption[] = [
     key: ROUTE_NAMES.TAXONOMY_GROUP,
     label: "分类与标签",
     icon: renderIcon(Tags),
-    children: [...categoryMenus],
+    children: [...categoryMenus, ...tagMenus],
   },
 ];
 

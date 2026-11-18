@@ -5,11 +5,9 @@ import { CATEGORY_STATUS, type CategoryStatus } from "../types/category.types";
 defineProps<{
   count: number;
   batchPending: boolean;
-  batchStatusPending: boolean;
-  batchDeletePending: boolean;
 }>();
 
-const emit = defineEmits<{
+const emits = defineEmits<{
   batchStatus: [status: CategoryStatus];
   batchDelete: [];
   clear: [];
@@ -25,9 +23,8 @@ const emit = defineEmits<{
           size="small"
           type="success"
           secondary
-          :loading="batchStatusPending"
           :disabled="batchPending"
-          @click="emit('batchStatus', CATEGORY_STATUS.ACTIVE)"
+          @click="emits('batchStatus', CATEGORY_STATUS.ACTIVE)"
         >
           批量启用
         </NButton>
@@ -35,9 +32,8 @@ const emit = defineEmits<{
           size="small"
           type="warning"
           secondary
-          :loading="batchStatusPending"
           :disabled="batchPending"
-          @click="emit('batchStatus', CATEGORY_STATUS.DISABLED)"
+          @click="emits('batchStatus', CATEGORY_STATUS.DISABLED)"
         >
           批量停用
         </NButton>
@@ -45,13 +41,12 @@ const emit = defineEmits<{
           size="small"
           type="error"
           secondary
-          :loading="batchDeletePending"
           :disabled="batchPending"
-          @click="emit('batchDelete')"
+          @click="emits('batchDelete')"
         >
           批量删除
         </NButton>
-        <NButton size="small" quaternary @click="emit('clear')">
+        <NButton size="small" quaternary @click="emits('clear')">
           取消选择
         </NButton>
       </NFlex>

@@ -6,6 +6,7 @@ export const ROUTE_NAMES = {
   NOT_FOUND: "not-found",
   TAXONOMY_GROUP: "taxonomy",
   CATEGORIES: "categories",
+  TAGS: "tags",
 } as const;
 
 export const ROUTE_PATHS = {
@@ -14,6 +15,7 @@ export const ROUTE_PATHS = {
   FORBIDDEN: "/403",
   NOT_FOUND: ":pathMatch(.*)*",
   CATEGORIES: "/taxonomy/categories",
+  TAGS: "/taxonomy/tags",
 } as const;
 
 export type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES];

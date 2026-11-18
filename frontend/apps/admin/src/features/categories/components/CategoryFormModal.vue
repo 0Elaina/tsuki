@@ -29,7 +29,7 @@ const props = withDefaults(
     submitting: false,
   },
 );
-const emit = defineEmits<{
+const emits = defineEmits<{
   submit: [payload: UpdateCategoryPayload];
 }>();
 
@@ -85,7 +85,7 @@ watch(
 
 async function handleSubmit(): Promise<void> {
   if (!(await validateForm(formRef.value))) return;
-  emit("submit", {
+  emits("submit", {
     name: formModel.name.trim(),
     sortOrder: formModel.sortOrder ?? 0,
   });

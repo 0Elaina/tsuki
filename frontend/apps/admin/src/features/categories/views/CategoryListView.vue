@@ -18,8 +18,10 @@ import { useCategoryListQuery } from "../api/category.queries";
 import CategoryBatchBar from "../components/CategoryBatchBar.vue";
 import CategoryFormModal from "../components/CategoryFormModal.vue";
 import CategoryTable from "../components/CategoryTable.vue";
-import { useCategoryActions } from "../composables/useCategoryActions";
+import { useCategoryBatchActions } from "../composables/useCategoryBatchActions";
 import { useCategoryFilters } from "../composables/useCategoryFilters";
+import { useCategoryFormModal } from "../composables/useCategoryFormModal";
+import { useCategoryRowActions } from "../composables/useCategoryRowActions";
 import { CATEGORY_STATUS } from "../types/category.types";
 
 const STATUS_OPTIONS: SelectOption[] = [
@@ -61,23 +63,26 @@ const pagination = createPagination(total);
 const {
   modalVisible,
   editingCategory,
-  togglingId,
-  deletingId,
-  checkedRowKeys,
-  selectedIds,
   formSubmitting,
-  batchPending,
-  batchStatusPending,
-  batchDeletePending,
   openCreateModal,
   openEditModal,
   handleModalSubmit,
-  handleToggleStatus,
-  handleDelete,
+} = useCategoryFormModal();
+
+const {
+  checkedRowKeys,
+  selectedIds,
+  batchPending,
+  removeSelectedKey,
   handleClearSelection,
   handleBatchStatus,
   handleBatchDelete,
-} = useCategoryActions();
+} = useCategoryBatchActions();
+
+const { togglingId, deletingId, handleToggleStatus, handleDelete } =
+  useCategoryRowActions({
+    onDeleted: removeSelectedKey,
+  });
 
 /** 空页自动回退 */
 watch(
@@ -169,8 +174,6 @@ async function handleRetry(): Promise<void> {
         <CategoryBatchBar
           :count="selectedIds.length"
           :batch-pending="batchPending"
-          :batch-status-pending="batchStatusPending"
-          :batch-delete-pending="batchDeletePending"
           @batch-status="handleBatchStatus"
           @batch-delete="handleBatchDelete"
           @clear="handleClearSelection"

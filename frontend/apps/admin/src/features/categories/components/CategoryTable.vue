@@ -38,7 +38,7 @@ const checkedRowKeys = defineModel<DataTableRowKey[]>("checkedRowKeys", {
   required: true,
 });
 
-const emit = defineEmits<{
+const emits = defineEmits<{
   retry: [];
   edit: [row: CategoryItem];
   toggleStatus: [row: CategoryItem];
@@ -108,7 +108,7 @@ const columns: DataTableColumns<CategoryItem> = [
               {
                 size: "small",
                 quaternary: true,
-                onClick: () => emit("edit", row),
+                onClick: () => emits("edit", row),
               },
               {
                 default: () => "编辑",
@@ -122,7 +122,7 @@ const columns: DataTableColumns<CategoryItem> = [
                 type: isActive ? "warning" : "success",
                 loading: props.togglingId === row.id,
                 disabled: props.togglingId === row.id,
-                onClick: () => emit("toggleStatus", row),
+                onClick: () => emits("toggleStatus", row),
               },
               {
                 default: () => (isActive ? "停用" : "启用"),
@@ -131,7 +131,7 @@ const columns: DataTableColumns<CategoryItem> = [
             h(
               NPopconfirm,
               {
-                onPositiveClick: () => emit("delete", row.id),
+                onPositiveClick: () => emits("delete", row.id),
               },
               {
                 trigger: () =>
@@ -166,7 +166,7 @@ const columns: DataTableColumns<CategoryItem> = [
     :description="errorMessage"
     :retrying="fetching"
     class="flex-1"
-    @retry="emit('retry')"
+    @retry="emits('retry')"
   />
   <NDataTable
     v-else
