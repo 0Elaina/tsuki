@@ -4,6 +4,7 @@ import ErrorState from "@/shared/ui/ErrorState.vue";
 import LoadingState from "@/shared/ui/LoadingState.vue";
 import { formatDateTime } from "@tsuki/shared/utils/time";
 import {
+  type DataTableRowKey,
   NButton,
   NDataTable,
   NFlex,
@@ -33,6 +34,10 @@ const props = withDefaults(
   },
 );
 
+const checkedRowKeys = defineModel<DataTableRowKey[]>("checkedRowKeys", {
+  required: true,
+});
+
 const emit = defineEmits<{
   retry: [];
   edit: [row: CategoryItem];
@@ -41,6 +46,9 @@ const emit = defineEmits<{
 }>();
 
 const columns: DataTableColumns<CategoryItem> = [
+  {
+    type: "selection",
+  },
   {
     title: "分类名称",
     key: "name",
@@ -161,6 +169,7 @@ const columns: DataTableColumns<CategoryItem> = [
   />
   <NDataTable
     v-else
+    v-model:checked-row-keys="checkedRowKeys"
     remote
     :columns="columns"
     :data="items"

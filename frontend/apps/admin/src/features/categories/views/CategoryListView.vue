@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {
+  type DataTableRowKey,
+  NAlert,
   NButton,
   NCard,
   NFlex,
@@ -8,12 +10,15 @@ import {
   NInput,
   NSelect,
   NText,
+  useDialog,
   useMessage,
   type SelectOption,
 } from "naive-ui";
 import {
+  CATEGORY_LIMITS,
   CATEGORY_STATUS,
   type CategoryItem,
+  type CategoryStatus,
   type UpdateCategoryPayload,
 } from "../types/category.types";
 import { computed, ref, shallowRef, watch } from "vue";
@@ -22,6 +27,8 @@ import { usePagination } from "@/shared/composables/usePagination";
 import { Plus, RotateCcw, Search } from "lucide-vue-next";
 import { getErrorMessage } from "@tsuki/api-client";
 import {
+  useBatchCategoryStatusMutation,
+  useBatchDeleteCategoryMutation,
   useCreateCategoryMutation,
   useDeleteCategoryMutation,
   useUpdateCategoryMutation,
@@ -73,6 +80,8 @@ const categoryCreateMutation = useCreateCategoryMutation();
 const categoryUpdateMutation = useUpdateCategoryMutation();
 const categoryUpdateStatusMutation = useUpdateCategoryStatusMutation();
 const categoryDeleteMutation = useDeleteCategoryMutation();
+const categoryBatchStatusMutation = useBatchCategoryStatusMutation();
+const categoryBatchDeleteMutation = useBatchDeleteCategoryMutation();
 
 const categoryListItems = computed(
   () => categoryListQuery.data.value?.items ?? [],
@@ -82,6 +91,15 @@ const formSubmitting = computed(
   () =>
     categoryCreateMutation.isPending.value ||
     categoryUpdateMutation.isPending.value,
+);
+
+const dialog = useDialog();
+const checkedRowKeys = ref<DataTableRowKey[]>([]);
+const selectedIds = computed(() => checkedRowKeys.value.map(String));
+const batchPending = computed(
+  () =>
+    categoryBatchDeleteMutation.isPending.value ||
+    categoryBatchStatusMutation.isPending.value,
 );
 
 /** 空页自动回退 */
@@ -167,11 +185,73 @@ function handleDelete(id: string): void {
   deletingId.value = id;
   categoryDeleteMutation.mutate(id, {
     onSuccess: () => {
+      checkedRowKeys.value = checkedRowKeys.value.filter(
+        (key) => String(key) !== id,
+      );
       message.success("分类已删除");
     },
     onSettled: () => {
       if (deletingId.value === id) deletingId.value = null;
     },
+  });
+}
+
+function handleClearSelection(): void {
+  checkedRowKeys.value = [];
+}
+
+function validateBatchSelection(): boolean {
+  if (selectedIds.value.length === 0) return false;
+  if (selectedIds.value.length > CATEGORY_LIMITS.BATCH_MAX_IDS) {
+    message.warning(`单次最多操作 ${CATEGORY_LIMITS.BATCH_MAX_IDS} 个分类`);
+    return false;
+  }
+  return true;
+}
+
+function handleBatchStatus(targetStatus: CategoryStatus): void {
+  if (!validateBatchSelection()) return;
+  categoryBatchStatusMutation.mutate(
+    {
+      ids: selectedIds.value,
+      status: targetStatus,
+    },
+    {
+      onSuccess: (count) => {
+        checkedRowKeys.value = [];
+        if (count > 0) {
+          message.success(`已更新 ${count} 个分类的状态`);
+        } else {
+          message.success("所选分类均已处于目标状态");
+        }
+      },
+    },
+  );
+}
+
+function handleBatchDelete(): void {
+  if (!validateBatchSelection()) return;
+
+  const d = dialog.warning({
+    title: "确认批量删除",
+    content: `确定删除选中的 ${selectedIds.value.length} 个分类吗, 此操作不可撤销`,
+    positiveText: "确认删除",
+    negativeText: "取消",
+    onPositiveClick: () =>
+      categoryBatchDeleteMutation
+        .mutateAsync({
+          ids: selectedIds.value,
+        })
+        .then((count) => {
+          checkedRowKeys.value = [];
+          message.success(`已删除 ${count} 个分类`);
+        })
+        // 防止弹窗点击后自动关闭
+        .catch(() => false)
+        // 防止重复点击确认
+        .finally(() => {
+          d.loading = false;
+        }),
   });
 }
 </script>
@@ -235,8 +315,51 @@ function handleDelete(id: string): void {
           </NButton>
         </NFlex>
 
+        <!-- 批量操作栏 -->
+        <NAlert v-if="selectedIds.length > 0" type="info" :show-icon="false">
+          <NFlex align="center" justify="space-between" :wrap="true" :size="8">
+            <NText>已选择 {{ selectedIds.length }} 项</NText>
+            <NFlex align="center" :size="8">
+              <NButton
+                size="small"
+                type="success"
+                secondary
+                :loading="categoryBatchStatusMutation.isPending.value"
+                :disabled="batchPending"
+                @click="handleBatchStatus(CATEGORY_STATUS.ACTIVE)"
+              >
+                批量启用
+              </NButton>
+              <NButton
+                size="small"
+                type="warning"
+                secondary
+                :loading="categoryBatchStatusMutation.isPending.value"
+                :disabled="batchPending"
+                @click="handleBatchStatus(CATEGORY_STATUS.DISABLED)"
+              >
+                批量停用
+              </NButton>
+              <NButton
+                size="small"
+                type="error"
+                secondary
+                :loading="categoryBatchDeleteMutation.isPending.value"
+                :disabled="batchPending"
+                @click="handleBatchDelete"
+              >
+                批量删除
+              </NButton>
+              <NButton size="small" quaternary @click="handleClearSelection">
+                取消选择
+              </NButton>
+            </NFlex>
+          </NFlex>
+        </NAlert>
+
         <!-- 数据区域 -->
         <CategoryTable
+          v-model:checked-row-keys="checkedRowKeys"
           :items="categoryListItems"
           :loading="categoryListQuery.isLoading.value"
           :fetching="categoryListQuery.isFetching.value"
