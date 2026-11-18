@@ -4,6 +4,8 @@ export const ROUTE_NAMES = {
   SHELL: "admin-shell",
   FORBIDDEN: "forbidden",
   NOT_FOUND: "not-found",
+  TAXONOMY_GROUP: "taxonomy",
+  CATEGORIES: "categories",
 } as const;
 
 export const ROUTE_PATHS = {
@@ -11,6 +13,7 @@ export const ROUTE_PATHS = {
   HOME: "/",
   FORBIDDEN: "/403",
   NOT_FOUND: ":pathMatch(.*)*",
+  CATEGORIES: "/taxonomy/categories",
 } as const;
 
 export type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES];
