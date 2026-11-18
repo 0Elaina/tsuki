@@ -235,7 +235,7 @@ function handleUserDropdownSelect(key: string | number): void {
       <NLayoutContent
         class="min-h-0 flex-1"
         :native-scrollbar="false"
-        content-class="pb-2"
+        content-class="flex min-h-full flex-col"
       >
         <RouterView />
       </NLayoutContent>

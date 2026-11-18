@@ -35,11 +35,11 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryMapper categoryMapper;
 
     /**
-     * 创建分区
+     * 创建分类
      *
-     * @param name      分区名称
+     * @param name      分类名称
      * @param sortOrder 排序顺序
-     * @return 分区信息
+     * @return 分类信息
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -54,15 +54,15 @@ public class CategoryServiceImpl implements CategoryService {
         } catch (DuplicateKeyException ex) {
             throw new BusinessException(CategoryApiCode.CATEGORY_NAME_CONFLICT);
         }
-        log.info("创建分区成功: id={}, name={}", category.getId(), category.getName());
+        log.info("创建分类成功: id={}, name={}", category.getId(), category.getName());
         return CategoryResponse.of(category);
     }
 
     /**
-     * 根据ID查询分区
+     * 根据ID查询分类
      *
-     * @param id 分区ID
-     * @return 分区信息
+     * @param id 分类ID
+     * @return 分类信息
      */
     @Override
     public CategoryResponse findById(Long id) {
@@ -74,10 +74,10 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     /**
-     * 查询分区列表
+     * 查询分类列表
      *
      * @param query 查询参数
-     * @return 分区列表
+     * @return 分类列表
      */
     @Override
     public PageResult<CategoryResponse> list(CategoryQuery query) {
@@ -96,12 +96,12 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     /**
-     * 更新分区
+     * 更新分类
      *
-     * @param id        分区ID
-     * @param name      分区名称
+     * @param id        分类ID
+     * @param name      分类名称
      * @param sortOrder 排序顺序
-     * @return 分区信息
+     * @return 分类信息
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -122,16 +122,16 @@ public class CategoryServiceImpl implements CategoryService {
             throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND);
         }
 
-        log.info("更新分区成功: id={}, name={}", category.getId(), category.getName());
+        log.info("更新分类成功: id={}, name={}", category.getId(), category.getName());
         return findById(id);
     }
 
     /**
-     * 更新分区状态
+     * 更新分类状态
      *
-     * @param id     分区ID
-     * @param status 分区状态
-     * @return 分区信息
+     * @param id     分类ID
+     * @param status 分类状态
+     * @return 分类信息
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -144,30 +144,30 @@ public class CategoryServiceImpl implements CategoryService {
         if (updated == 0) {
             throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND);
         }
-        log.info("更新分区状态成功: id={}, status={}", category.getId(), category.getStatus());
+        log.info("更新分类状态成功: id={}, status={}", category.getId(), category.getStatus());
         return findById(id);
     }
 
     /**
-     * 删除分区
+     * 删除分类
      *
-     * @param id 分区ID
+     * @param id 分类ID
      */
     @Override
     public void delete(Long id) {
         int deleted = categoryMapper.deleteById(id);
         if (deleted == 0) {
-            log.warn("目标分区不存在, 幂等成功, id={}", id);
+            log.warn("目标分类不存在, 幂等成功, id={}", id);
             return;
         }
-        log.info("删除目标分区成功, id={}", id);
+        log.info("删除目标分类成功, id={}", id);
     }
 
     /**
-     * 批量更新分区状态
+     * 批量更新分类状态
      *
-     * @param ids    分区ID列表
-     * @param status 分区状态
+     * @param ids    分类ID列表
+     * @param status 分类状态
      * @return 影响行数
      */
     @Override
@@ -177,14 +177,14 @@ public class CategoryServiceImpl implements CategoryService {
         List<Category> categories = categoryMapper.selectByIdsForUpdate(distinctIds);
 
         if (categories.size() != distinctIds.size()) {
-            throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND, "部分分区不存在, 请刷新列表后重试");
+            throw new BusinessException(CategoryApiCode.CATEGORY_NOT_FOUND, "部分分类不存在, 请刷新列表后重试");
         }
 
         // 需要更新的 id 列表
         List<Long> needUpdateIds = categories.stream().filter(
                 c -> !status.name().equals(c.getStatus())).map(Category::getId).toList();
         if (needUpdateIds.isEmpty()) {
-            log.debug("没有需要更新的分区, 跳过更新, ids={}", ids);
+            log.debug("没有需要更新的分类, 跳过更新, ids={}", ids);
             return 0;
         }
 
@@ -193,14 +193,14 @@ public class CategoryServiceImpl implements CategoryService {
                 .in(Category::getId, needUpdateIds)
                 .set(Category::getStatus, status.name())
                 .set(Category::getUpdatedAt, now));
-        log.info("批量更新分区状态成功, targetStatus={}, idsCount={}, updatedCount={}", status, ids.size(), updatedCount);
+        log.info("批量更新分类状态成功, targetStatus={}, idsCount={}, updatedCount={}", status, ids.size(), updatedCount);
         return updatedCount;
     }
 
     /**
-     * 批量删除分区
+     * 批量删除分类
      *
-     * @param ids 分区ID列表
+     * @param ids 分类ID列表
      * @return 影响行数
      */
     @Override
@@ -208,7 +208,7 @@ public class CategoryServiceImpl implements CategoryService {
     public int batchDelete(List<Long> ids) {
         List<Long> distinctIds = ids.stream().distinct().toList();
         int deletedCount = categoryMapper.deleteByIds(distinctIds);
-        log.info("批量删除分区成功, idsCount={}, deletedCount={}", ids.size(), deletedCount);
+        log.info("批量删除分类成功, idsCount={}, deletedCount={}", ids.size(), deletedCount);
         return deletedCount;
     }
 }

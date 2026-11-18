@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     "./router/safe-redirect": "./src/router/safe-redirect.ts",
-    "./constants/auth": "./src/constants/auth.ts"
+    "./constants/auth": "./src/constants/auth.ts",
+    "./constants/pagination": "./src/constants/pagination.ts",
+    "./constants/number": "./src/constants/number.ts",
+    "./constants/time": "./src/constants/time.ts",
+    "./utils/number": "./src/utils/number.ts",
+    "./utils/time": "./src/utils/time.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

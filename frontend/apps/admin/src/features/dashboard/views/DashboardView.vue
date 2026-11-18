@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { palette } from "@/app/theme/tokens";
 import { useMeQuery } from "@/features/auth/api/auth.queries";
+import { ROUTE_NAMES } from "@/shared/constants/routes";
 import ErrorState from "@/shared/ui/ErrorState.vue";
 import LoadingState from "@/shared/ui/LoadingState.vue";
 import { getErrorMessage } from "@tsuki/api-client";
-import { Music } from "lucide-vue-next";
+import { FolderTree } from "lucide-vue-next";
 import {
   NCard,
   NDescriptions,
@@ -18,6 +19,9 @@ import {
   NText,
 } from "naive-ui";
 import { computed, type Component } from "vue";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const meQuery = useMeQuery();
 
@@ -31,11 +35,11 @@ interface UpcomingModuleItem {
 
 const UPCOMING_MODULES: readonly UpcomingModuleItem[] = [
   {
-    key: "test1",
-    title: "test1",
-    description: "测试站位1",
-    tag: "temp",
-    icon: Music,
+    key: ROUTE_NAMES.CATEGORIES,
+    title: "分类管理",
+    description: "维护曲库音乐分类、排序权重和启停状态",
+    tag: "已上线",
+    icon: FolderTree,
   },
 ];
 
@@ -46,6 +50,10 @@ const greetingTitle = computed(() => {
 });
 async function handleRetry(): Promise<void> {
   await meQuery.refetch();
+}
+
+function handleModuleClick(routeName: string): void {
+  void router.push({ name: routeName });
 }
 </script>
 
@@ -102,7 +110,12 @@ async function handleRetry(): Promise<void> {
     <NCard title="功能模块概览">
       <NGrid cols="1 m:3" responsive="screen" :x-gap="12" :y-gap="12">
         <NGi v-for="item in UPCOMING_MODULES" :key="item.key">
-          <NCard size="small" embedded class="h-full">
+          <NCard
+            size="small"
+            embedded
+            class="h-full cursor-pointer transition-colors hover:border-sakura"
+            @click="handleModuleClick(item.key)"
+          >
             <NFlex vertical :size="10">
               <!-- 卡片顶部 -->
               <NFlex align="center" justify="space-between">
@@ -121,7 +134,7 @@ async function handleRetry(): Promise<void> {
                   </NText>
                 </NFlex>
                 <!-- 右侧标签 -->
-                <NTag size="small" :bordered="false">
+                <NTag size="small" type="success" :bordered="false">
                   {{ item.tag }}
                 </NTag>
               </NFlex>

@@ -1,4 +1,8 @@
+import { categoryMenus } from "@/features/categories/menu";
 import { dashboardMenus } from "@/features/dashboard/menu";
+import { ROUTE_NAMES } from "@/shared/constants/routes";
+import { renderIcon } from "@/shared/utils/icon";
+import { Tags } from "lucide-vue-next";
 import type { MenuOption } from "naive-ui";
 import type {
   RouteLocationNormalizedLoaded,
@@ -10,7 +14,15 @@ export interface BreadcrumbItem {
   name?: RouteRecordName;
 }
 
-export const adminMenuOptions: MenuOption[] = [...dashboardMenus];
+export const adminMenuOptions: MenuOption[] = [
+  ...dashboardMenus,
+  {
+    key: ROUTE_NAMES.TAXONOMY_GROUP,
+    label: "分类与标签",
+    icon: renderIcon(Tags),
+    children: [...categoryMenus],
+  },
+];
 
 export function resolveActiveMenuKey(
   route: RouteLocationNormalizedLoaded,

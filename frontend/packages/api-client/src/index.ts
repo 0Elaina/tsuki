@@ -21,4 +21,5 @@ export {
   type PageQuery,
   type PageResult,
   type RequestConfig,
+  createPageResultSchema,
 } from "./http";
