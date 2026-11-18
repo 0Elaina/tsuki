@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  type DataTableRowKey,
   NButton,
   NDataTable,
   NFlex,
@@ -33,6 +34,10 @@ const props = withDefaults(
   },
 );
 
+const checkedRowKeys = defineModel<DataTableRowKey[]>("checkedRowKeys", {
+  required: true,
+});
+
 const emits = defineEmits<{
   retry: [];
   edit: [row: TagItem];
@@ -41,6 +46,9 @@ const emits = defineEmits<{
 }>();
 
 const columns: DataTableColumns<TagItem> = [
+  {
+    type: "selection",
+  },
   {
     title: "标签名称",
     key: "name",
@@ -162,6 +170,7 @@ const columns: DataTableColumns<TagItem> = [
   />
   <NDataTable
     v-else
+    v-model:checked-row-keys="checkedRowKeys"
     remote
     flex-height
     class="min-h-0 flex-1"

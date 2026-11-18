@@ -5,7 +5,7 @@ import { ROUTE_NAMES } from "@/shared/constants/routes";
 import ErrorState from "@/shared/ui/ErrorState.vue";
 import LoadingState from "@/shared/ui/LoadingState.vue";
 import { getErrorMessage } from "@tsuki/api-client";
-import { FolderTree } from "lucide-vue-next";
+import { FolderTree, Tag } from "lucide-vue-next";
 import {
   NCard,
   NDescriptions,
@@ -40,6 +40,13 @@ const UPCOMING_MODULES: readonly UpcomingModuleItem[] = [
     description: "维护曲库音乐分类、排序权重和启停状态",
     tag: "已上线",
     icon: FolderTree,
+  },
+  {
+    key: ROUTE_NAMES.TAGS,
+    title: "标签管理",
+    description: "维护曲库音乐标签、排序权重和启停状态",
+    tag: "已上线",
+    icon: Tag,
   },
 ];
 

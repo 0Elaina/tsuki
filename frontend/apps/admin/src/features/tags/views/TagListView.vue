@@ -15,12 +15,14 @@ import { usePagination } from "@/shared/composables/usePagination";
 import { useTagFilters } from "../composables/useTagFilters";
 import { computed, watch } from "vue";
 import { useTagListQuery } from "../api/tag.queries";
-import { Plus, RotateCcw, Search } from "lucide-vue-next";
-import TagTable from "../components/TagTable.vue";
 import { getErrorMessage } from "@tsuki/api-client";
+import { Plus, RotateCcw, Search } from "lucide-vue-next";
+import TagBatchBar from "../components/TagBatchBar.vue";
+import TagFormModal from "../components/TagFormModal.vue";
+import TagTable from "../components/TagTable.vue";
+import { useTagBatchActions } from "../composables/useTagBatchActions";
 import { useTagFormModal } from "../composables/useTagFormModal";
 import { useTagRowActions } from "../composables/useTagRowActions";
-import TagFormModal from "../components/TagFormModal.vue";
 
 const STATUS_OPTIONS: SelectOption[] = [
   {
@@ -50,8 +52,19 @@ const {
   openEditModal,
   handleModalSubmit,
 } = useTagFormModal();
+const {
+  checkedRowKeys,
+  selectedIds,
+  batchPending,
+  removeSelectedKey,
+  handleClearSelection,
+  handleBatchStatus,
+  handleBatchDelete,
+} = useTagBatchActions();
 const { togglingId, deletingId, handleToggleStatus, handleDelete } =
-  useTagRowActions();
+  useTagRowActions({
+    onDeleted: removeSelectedKey,
+  });
 
 const queryParams = computed(() => ({
   page: page.value,
@@ -153,8 +166,17 @@ async function handleRetry(): Promise<void> {
             重置
           </NButton>
         </NFlex>
+        <!-- 批量操作栏 -->
+        <TagBatchBar
+          :count="selectedIds.length"
+          :batch-pending="batchPending"
+          @batch-status="handleBatchStatus"
+          @batch-delete="handleBatchDelete"
+          @clear="handleClearSelection"
+        />
         <!-- 数据表格 -->
         <TagTable
+          v-model:checked-row-keys="checkedRowKeys"
           :items="tagListItems"
           :toggling-id="togglingId"
           :deleting-id="deletingId"
