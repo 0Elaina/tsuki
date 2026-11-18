@@ -257,45 +257,52 @@ function handleBatchDelete(): void {
 </script>
 
 <template>
-  <NFlex vertical :size="12" class="w-full">
-    <NCard>
-      <NFlex align="center" justify="space-between" :wrap="true" :size="12">
+  <div class="flex min-h-120 w-full flex-1 flex-col">
+    <NCard
+      class="flex min-h-0 flex-1 flex-col"
+      content-class="flex min-h-0 flex-1 flex-col"
+    >
+      <template #header>
         <NFlex vertical :size="4">
-          <NH2 class="mb-0">分类管理</NH2>
-          <NText :depth="3">维护曲库音乐分类、排序权重和启停状态</NText>
+          <NH2 class="m-0!">分类管理</NH2>
+          <NText :depth="3" class="text-sm font-normal">
+            维护曲库音乐分类、排序权重和启停状态
+          </NText>
         </NFlex>
+      </template>
+
+      <template #header-extra>
         <NButton type="primary" @click="openCreateModal">
           <template #icon>
             <NIcon :component="Plus" />
           </template>
           新建分类
         </NButton>
-      </NFlex>
-    </NCard>
+      </template>
 
-    <!-- 列表卡片 -->
-    <NCard>
-      <NFlex vertical :size="12">
+      <div class="flex min-h-0 flex-1 flex-col gap-3">
         <!-- 筛选栏 -->
-        <NFlex align="center" :wrap="true" :size="8">
-          <NInput
-            v-model:value="keywordDraft"
-            placeholder="搜索分类名称"
-            clearable
-            class="w-60"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <NIcon :component="Search" />
-            </template>
-          </NInput>
-          <NSelect
-            v-model:value="statusDraft"
-            :options="STATUS_OPTIONS"
-            placeholder="全部状态"
-            clearable
-            class="w-36"
-          />
+        <NFlex align="center" :wrap="true" :size="8" class="shrink-0">
+          <div class="w-60 shrink-0">
+            <NInput
+              v-model:value="keywordDraft"
+              placeholder="搜索分类名称"
+              clearable
+              @keyup.enter="handleSearch"
+            >
+              <template #prefix>
+                <NIcon :component="Search" />
+              </template>
+            </NInput>
+          </div>
+          <div class="w-36 shrink-0">
+            <NSelect
+              v-model:value="statusDraft"
+              :options="STATUS_OPTIONS"
+              placeholder="全部状态"
+              clearable
+            />
+          </div>
           <NButton
             type="primary"
             secondary
@@ -316,7 +323,12 @@ function handleBatchDelete(): void {
         </NFlex>
 
         <!-- 批量操作栏 -->
-        <NAlert v-if="selectedIds.length > 0" type="info" :show-icon="false">
+        <NAlert
+          v-if="selectedIds.length > 0"
+          type="info"
+          :show-icon="false"
+          class="shrink-0"
+        >
           <NFlex align="center" justify="space-between" :wrap="true" :size="8">
             <NText>已选择 {{ selectedIds.length }} 项</NText>
             <NFlex align="center" :size="8">
@@ -379,7 +391,7 @@ function handleBatchDelete(): void {
           @toggle-status="handleToggleStatus"
           @delete="handleDelete"
         />
-      </NFlex>
+      </div>
     </NCard>
 
     <CategoryFormModal
@@ -388,5 +400,5 @@ function handleBatchDelete(): void {
       :submitting="formSubmitting"
       @submit="handleModalSubmit"
     />
-  </NFlex>
+  </div>
 </template>

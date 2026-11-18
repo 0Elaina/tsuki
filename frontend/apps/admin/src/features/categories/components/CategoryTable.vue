@@ -160,17 +160,20 @@ const columns: DataTableColumns<CategoryItem> = [
 </script>
 
 <template>
-  <LoadingState v-if="loading" label="正在加载分类列表..." />
+  <LoadingState v-if="loading" label="正在加载分类列表..." class="flex-1" />
   <ErrorState
     v-else-if="isError"
     :description="errorMessage"
     :retrying="fetching"
+    class="flex-1"
     @retry="emit('retry')"
   />
   <NDataTable
     v-else
     v-model:checked-row-keys="checkedRowKeys"
     remote
+    flex-height
+    class="min-h-0 flex-1"
     :columns="columns"
     :data="items"
     :loading="fetching"
