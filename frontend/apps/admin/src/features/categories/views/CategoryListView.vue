@@ -7,9 +7,11 @@ import {
   NH2,
   NIcon,
   NInput,
+  NPopconfirm,
   NSelect,
   NTag,
   NText,
+  useMessage,
   type DataTableColumns,
   type SelectOption,
 } from "naive-ui";
@@ -18,22 +20,38 @@ import {
   CATEGORY_STATUS_SET,
   type CategoryItem,
   type CategoryStatus,
+  type UpdateCategoryPayload,
 } from "../types/category.types";
-import { computed, h, ref, watch } from "vue";
+import { computed, h, ref, shallowRef, watch } from "vue";
 import { PAGE_LIMITS } from "@tsuki/shared/constants/pagination";
 import { useCategoryListQuery } from "../api/category.queries";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { usePagination } from "@/shared/composables/usePagination";
 import { formatDateTime } from "@tsuki/shared/utils/time";
-import { RotateCcw, Search } from "lucide-vue-next";
+import { Plus, RotateCcw, Search } from "lucide-vue-next";
 import LoadingState from "@/shared/ui/LoadingState.vue";
 import ErrorState from "@/shared/ui/ErrorState.vue";
 import { getErrorMessage } from "@tsuki/api-client";
 import EmptyState from "@/shared/ui/EmptyState.vue";
+import {
+  useCreateCategoryMutation,
+  useDeleteCategoryMutation,
+  useUpdateCategoryMutation,
+  useUpdateCategoryStatusMutation,
+} from "../api/category.mutations";
+import CategoryFormModal from "../components/CategoryFormModal.vue";
 
 const route = useRoute();
 const router = useRouter();
-const { page, pageSize, createPagination } = usePagination();
+const { page, pageSize, setPage, createPagination } = usePagination();
+const message = useMessage();
+const modalVisible = ref(false);
+const editingCategory = shallowRef<CategoryItem | null>(null);
+
+// 声明单行操作加锁
+const togglingId = ref<string | null>(null);
+const deletingId = ref<string | null>(null);
+
 const STATUS_OPTIONS: SelectOption[] = [
   {
     label: "启用",
@@ -60,6 +78,11 @@ const keywordDraft = ref("");
 const statusDraft = ref<CategoryStatus | null>(null);
 
 const categoryListQuery = useCategoryListQuery(queryParams);
+const categoryCreateMutation = useCreateCategoryMutation();
+const categoryUpdateMutation = useUpdateCategoryMutation();
+const categoryUpdateStatusMutation = useUpdateCategoryStatusMutation();
+const categoryDeleteMutation = useDeleteCategoryMutation();
+
 const categoryListItems = computed(
   () => categoryListQuery.data.value?.items ?? [],
 );
@@ -68,6 +91,27 @@ const hasActiveFilters = computed(
   () =>
     Boolean(queryParams.value.keyword) ||
     queryParams.value.status !== undefined,
+);
+
+const formSubmitting = computed(
+  () =>
+    categoryCreateMutation.isPending.value ||
+    categoryUpdateMutation.isPending.value,
+);
+
+/** 空页自动回退 */
+watch(
+  () =>
+    [categoryListQuery.isFetching.value, categoryListQuery.data.value] as const,
+  ([fetching, data]) => {
+    if (fetching || !data) return;
+    if (data.page > 1 && data.items.length === 0) {
+      const lastPage = Math.max(1, Math.ceil(data.total / data.pageSize));
+      if (page.value !== lastPage) {
+        setPage(lastPage);
+      }
+    }
+  },
 );
 
 const pagination = createPagination(total);
@@ -113,6 +157,76 @@ async function handleRetry(): Promise<void> {
   await categoryListQuery.refetch();
 }
 
+function openCreateModal(): void {
+  editingCategory.value = null;
+  modalVisible.value = true;
+}
+
+function openEditModal(row: CategoryItem): void {
+  editingCategory.value = row;
+  modalVisible.value = true;
+}
+
+function handleModalSubmit(payload: UpdateCategoryPayload): void {
+  if (editingCategory.value) {
+    categoryUpdateMutation.mutate(
+      {
+        id: editingCategory.value.id,
+        data: payload,
+      },
+      {
+        onSuccess: () => {
+          modalVisible.value = false;
+          message.success("分类更新成功");
+        },
+      },
+    );
+  } else {
+    categoryCreateMutation.mutate(payload, {
+      onSuccess: () => {
+        modalVisible.value = false;
+        message.success("分类创建成功");
+      },
+    });
+  }
+}
+
+function handleToggleStatus(row: CategoryItem): void {
+  const nextStatus =
+    row.status === CATEGORY_STATUS.ACTIVE
+      ? CATEGORY_STATUS.DISABLED
+      : CATEGORY_STATUS.ACTIVE;
+  togglingId.value = row.id;
+  categoryUpdateStatusMutation.mutate(
+    {
+      id: row.id,
+      status: nextStatus,
+    },
+    {
+      onSuccess: () => {
+        message.success(
+          nextStatus === CATEGORY_STATUS.ACTIVE ? "分类已启用" : "分类已停用",
+        );
+      },
+      onSettled: () => {
+        if (togglingId.value === row.id) togglingId.value = null;
+      },
+    },
+  );
+}
+
+function handleDelete(id: string): void {
+  deletingId.value = id;
+  categoryDeleteMutation.mutate(id, {
+    onSuccess: () => {
+      message.success("分类已删除");
+    },
+    onSettled: () => {
+      if (deletingId.value === id) deletingId.value = null;
+    },
+  });
+}
+
 const columns: DataTableColumns<CategoryItem> = [
   {
     title: "分类名称",
@@ -154,15 +268,90 @@ const columns: DataTableColumns<CategoryItem> = [
       return formatDateTime(row.updatedAt, "datetime");
     },
   },
+  {
+    title: "操作",
+    key: "actions",
+    width: 200,
+    render(row) {
+      const isActive = row.status === CATEGORY_STATUS.ACTIVE;
+      return h(
+        NFlex,
+        {
+          size: 8,
+          wrap: false,
+        },
+        {
+          default: () => [
+            h(
+              NButton,
+              {
+                size: "small",
+                quaternary: true,
+                onClick: () => openEditModal(row),
+              },
+              {
+                default: () => "编辑",
+              },
+            ),
+            h(
+              NButton,
+              {
+                size: "small",
+                quaternary: true,
+                type: isActive ? "warning" : "success",
+                loading: togglingId.value === row.id,
+                disabled: togglingId.value === row.id,
+                onClick: () => handleToggleStatus(row),
+              },
+              {
+                default: () => (isActive ? "停用" : "启用"),
+              },
+            ),
+            h(
+              NPopconfirm,
+              {
+                onPositiveClick: () => handleDelete(row.id),
+              },
+              {
+                trigger: () =>
+                  h(
+                    NButton,
+                    {
+                      size: "small",
+                      quaternary: true,
+                      type: "error",
+                      loading: deletingId.value === row.id,
+                      disabled: deletingId.value === row.id,
+                    },
+                    {
+                      default: () => "删除",
+                    },
+                  ),
+                default: () => `确认删除分类 ${row.name} 吗 ?`,
+              },
+            ),
+          ],
+        },
+      );
+    },
+  },
 ];
 </script>
 
 <template>
   <NFlex vertical :size="12" class="w-full">
     <NCard>
-      <NFlex vertical :size="4">
-        <NH2 class="mb-0">分类管理</NH2>
-        <NText :depth="3">维护曲库音乐分类、排序权重和启停状态</NText>
+      <NFlex align="center" justify="space-between" :wrap="true" :size="12">
+        <NFlex vertical :size="4">
+          <NH2 class="mb-0">分类管理</NH2>
+          <NText :depth="3">维护曲库音乐分类、排序权重和启停状态</NText>
+        </NFlex>
+        <NButton type="primary" @click="openCreateModal">
+          <template #icon>
+            <NIcon :component="Plus" />
+          </template>
+          新建分类
+        </NButton>
       </NFlex>
     </NCard>
 
@@ -243,5 +432,11 @@ const columns: DataTableColumns<CategoryItem> = [
         </NDataTable>
       </NFlex>
     </NCard>
+    <CategoryFormModal
+      v-model:show="modalVisible"
+      :category="editingCategory"
+      :submitting="formSubmitting"
+      @submit="handleModalSubmit"
+    />
   </NFlex>
 </template>
