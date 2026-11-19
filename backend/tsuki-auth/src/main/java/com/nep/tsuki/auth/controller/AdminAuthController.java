@@ -69,7 +69,7 @@ public class AdminAuthController {
                 request.getRemoteAddr(), AccountType.ADMIN);
         CookieUtils.setCookie(response, CookieConstants.ADMIN_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                 CookieConstants.ADMIN_RT_COOKIE_PATH,
-                jwtProperties.refreshAdminIdleTtl(), environment);
+                jwtProperties.getRefreshAdminIdleTtl(), environment);
         cookieCsrfTokenRepository.saveToken(null, request, response);
         return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
     }
@@ -90,7 +90,7 @@ public class AdminAuthController {
             IssuedTokens issuedTokens = authService.refresh(AccountType.ADMIN, refreshToken);
             CookieUtils.setCookie(response, CookieConstants.ADMIN_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                     CookieConstants.ADMIN_RT_COOKIE_PATH,
-                    jwtProperties.refreshAdminIdleTtl(), environment);
+                    jwtProperties.getRefreshAdminIdleTtl(), environment);
             return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
         } catch (BusinessException ex) {
             if (ex.getApiCode() == AuthApiCode.INVALID_REFRESH_TOKEN) {

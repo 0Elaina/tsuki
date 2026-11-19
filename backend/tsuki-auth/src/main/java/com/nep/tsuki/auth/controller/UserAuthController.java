@@ -67,7 +67,7 @@ public class UserAuthController {
                 request.getRemoteAddr(), AccountType.USER);
         CookieUtils.setCookie(response, CookieConstants.USER_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                 CookieConstants.USER_RT_COOKIE_PATH,
-                jwtProperties.refreshUserIdleTtl(), environment);
+                jwtProperties.getRefreshUserIdleTtl(), environment);
         cookieCsrfTokenRepository.saveToken(null, request, response);
         return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
     }
@@ -88,7 +88,7 @@ public class UserAuthController {
             IssuedTokens issuedTokens = authService.refresh(AccountType.USER, refreshToken);
             CookieUtils.setCookie(response, CookieConstants.USER_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                     CookieConstants.USER_RT_COOKIE_PATH,
-                    jwtProperties.refreshUserIdleTtl(), environment);
+                    jwtProperties.getRefreshUserIdleTtl(), environment);
             return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
         } catch (BusinessException ex) {
             if (ex.getApiCode() == AuthApiCode.INVALID_REFRESH_TOKEN) {

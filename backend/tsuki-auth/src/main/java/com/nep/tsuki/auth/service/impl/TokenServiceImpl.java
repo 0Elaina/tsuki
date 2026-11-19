@@ -42,13 +42,13 @@ public class TokenServiceImpl implements TokenService {
     @Override
     public IssuedTokens issue(AccountType accountType, Long accountId, String sid, String refreshJti,
             Instant refreshExpiresAt, Instant now) {
-        Duration accessTtl = jwtProperties.accessTtl();
+        Duration accessTtl = jwtProperties.getAccessTtl();
         Instant accessExpiresAt = TimeUtils.minInstant(now.plus(accessTtl), refreshExpiresAt);
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 
         // 构造访问令牌
         JwtClaimsSet accessClaims = JwtClaimsSet.builder()
-                .issuer(jwtProperties.issuer())
+                .issuer(jwtProperties.getIssuer())
                 .subject(String.valueOf(accountId))
                 .issuedAt(now)
                 .expiresAt(accessExpiresAt)
@@ -58,7 +58,7 @@ public class TokenServiceImpl implements TokenService {
 
         // 构造刷新令牌
         JwtClaimsSet refreshClaims = JwtClaimsSet.builder()
-                .issuer(jwtProperties.issuer())
+                .issuer(jwtProperties.getIssuer())
                 .subject(String.valueOf(accountId))
                 .issuedAt(now)
                 .expiresAt(refreshExpiresAt)
