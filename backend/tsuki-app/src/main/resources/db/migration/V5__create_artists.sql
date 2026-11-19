@@ -1,10 +1,10 @@
 CREATE TABLE artists (
     id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
-    name VARCHAR(128) NOT NULL,
-    sort_name VARCHAR(128),
+    name VARCHAR(256) NOT NULL,
+    sort_name VARCHAR(256),
     type VARCHAR(16) NOT NULL,
     country_code VARCHAR(2),
-    disambiguation VARCHAR(128),
+    disambiguation VARCHAR(256),
     biography TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -39,7 +39,7 @@ COMMENT ON COLUMN artists.updated_at IS '最后更新时间（UTC 带时区时�
 CREATE TABLE artist_aliases (
     id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
     artist_id BIGINT NOT NULL,
-    name VARCHAR(128) NOT NULL,
+    name VARCHAR(256) NOT NULL,
     position INTEGER NOT NULL,
     CONSTRAINT pk_artist_aliases PRIMARY KEY (id),
     CONSTRAINT fk_artist_aliases_artists FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE CASCADE,
