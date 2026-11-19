@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.nep.tsuki.api.ApiResponse;
+import com.nep.tsuki.common.api.ApiResponse;
 import com.nep.tsuki.auth.config.JwtProperties;
 import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.CookieConstants;
@@ -21,7 +21,7 @@ import com.nep.tsuki.auth.model.vo.CsrfTokenResponse;
 import com.nep.tsuki.auth.model.vo.LoginResponse;
 import com.nep.tsuki.auth.service.AuthService;
 import com.nep.tsuki.auth.utils.CookieUtils;
-import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.common.exceptions.BusinessException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -67,7 +67,7 @@ public class UserAuthController {
                 request.getRemoteAddr(), AccountType.USER);
         CookieUtils.setCookie(response, CookieConstants.USER_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                 CookieConstants.USER_RT_COOKIE_PATH,
-                jwtProperties.refreshUserIdleTtl(), environment);
+                jwtProperties.getRefreshUserIdleTtl(), environment);
         cookieCsrfTokenRepository.saveToken(null, request, response);
         return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
     }
@@ -88,7 +88,7 @@ public class UserAuthController {
             IssuedTokens issuedTokens = authService.refresh(AccountType.USER, refreshToken);
             CookieUtils.setCookie(response, CookieConstants.USER_RT_COOKIE_NAME, issuedTokens.refreshToken(),
                     CookieConstants.USER_RT_COOKIE_PATH,
-                    jwtProperties.refreshUserIdleTtl(), environment);
+                    jwtProperties.getRefreshUserIdleTtl(), environment);
             return ApiResponse.success(new LoginResponse(issuedTokens.accessToken(), issuedTokens.expiresIn()));
         } catch (BusinessException ex) {
             if (ex.getApiCode() == AuthApiCode.INVALID_REFRESH_TOKEN) {

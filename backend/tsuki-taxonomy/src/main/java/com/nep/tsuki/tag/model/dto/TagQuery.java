@@ -1,6 +1,6 @@
 package com.nep.tsuki.tag.model.dto;
 
-import com.nep.tsuki.api.PageQuery;
+import com.nep.tsuki.common.api.PageQuery;
 import com.nep.tsuki.tag.model.enums.TagStatus;
 
 import lombok.AllArgsConstructor;

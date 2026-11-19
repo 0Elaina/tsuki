@@ -2,7 +2,7 @@ package com.nep.tsuki.category.constants;
 
 import org.springframework.http.HttpStatus;
 
-import com.nep.tsuki.api.ApiCode;
+import com.nep.tsuki.common.api.ApiCode;
 
 public final class CategoryApiCode {
     private CategoryApiCode() {

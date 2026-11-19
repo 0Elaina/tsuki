@@ -31,7 +31,7 @@ public class JwtConfig {
     SecretKey secretKey(JwtProperties jwtProperties) {
         byte[] bytes;
         try {
-            bytes = Base64.getDecoder().decode(jwtProperties.secret());
+            bytes = Base64.getDecoder().decode(jwtProperties.getSecret());
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException("secret 配置错误，非法的 Base64 编码");
         }
@@ -53,7 +53,7 @@ public class JwtConfig {
         OAuth2TokenValidator<Jwt> typeValidator = new JwtClaimValidator<String>(JwtConstants.TOKEN_TYPE,
                 TokenType.ACCESS.name()::equals);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()), typeValidator));
+                JwtValidators.createDefaultWithIssuer(jwtProperties.getIssuer()), typeValidator));
         return decoder;
     }
 
@@ -64,7 +64,7 @@ public class JwtConfig {
         OAuth2TokenValidator<Jwt> typeValidator = new JwtClaimValidator<String>(JwtConstants.TOKEN_TYPE,
                 TokenType.REFRESH.name()::equals);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()), typeValidator));
+                JwtValidators.createDefaultWithIssuer(jwtProperties.getIssuer()), typeValidator));
         return decoder;
     }
 

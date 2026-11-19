@@ -14,7 +14,7 @@ import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.AuthRedisConstants;
 import com.nep.tsuki.auth.model.enums.AccountType;
 import com.nep.tsuki.auth.service.LoginRateLimitService;
-import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.common.exceptions.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

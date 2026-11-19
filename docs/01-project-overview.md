@@ -4,17 +4,27 @@ Tsuki 是一个由个人独立开发和长期维护的在线音乐网站，参�
 
 ## 应用组织
 
-后端按业务拆分 Maven 子模块，由一个 Spring Boot 启动模块组装为一个进程，使用一个 PostgreSQL 数据库。每个业务模块负责自己的 HTTP 接口、业务规则和数据访问。以曲库为例，管理端编辑入口与用户端读取入口同属曲库模块，各自声明访问权限。跨模块调用依赖对方的公开接口，并在调用方 POM 中声明依赖。这样的组织让同一业务的改动集中，构建依赖也能直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
+后端按职责与业务拆分 Maven 子模块，由 `tsuki-app` 启动模块组装为一个进程，使用一个 PostgreSQL 数据库：
+
+- `tsuki-app`：负责应用启动、模块组装、Flyway 数据库迁移，以及数据源、Redis、MyBatis-Plus 和对象存储等运行参数配置。
+- `tsuki-infra`：集中管理 PostgreSQL 驱动、MyBatis-Plus 装配（分页拦截器、UTC 自动填充与公共分页适配器 `MybatisPageAdapter`）、Redis 自动装配以及 RustFS（`S3Client`）客户端配置；供启动模块装配及需要持久化或中间件能力的业务模块复用。
+- `tsuki-common`：仅提供统一响应、公共异常处理、Web 参数校验和解耦后的公共分页类型（`PageQuery`、`PageResult`），不依赖具体持久化或中间件框架。
+- 业务模块（如认证、用户、分类与标签等）：各自负责自己的 HTTP 接口、业务规则、实体与 Mapper 数据访问，并在 POM 中显式声明直接使用的依赖。跨模块调用通过公开接口进行，构建依赖可直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
 
 ```mermaid
 flowchart LR
     subgraph Server["Spring Boot 后端进程"]
-        App["启动模块"] -->|组装| Catalog["曲库业务模块"]
-        App -->|组装| Business["其他业务模块"]
+        App["启动模块 (tsuki-app)"] -->|组装| Business["业务模块 (auth / user / taxonomy 等)"]
+        App -->|组装| Infra["基础设施模块 (tsuki-infra)"]
+        Business -->|复用适配器| Infra
+        Business --> Common["公共契约模块 (tsuki-common)"]
+        Infra --> Common
     end
-    Admin["管理端 Vue 应用"] -->|后台接口| Catalog
-    User["用户端 Vue 应用"] -->|用户接口| Catalog
-    Catalog --> Postgres["PostgreSQL 项目库"]
+    Admin["管理端 Vue 应用"] -->|后台接口| Business
+    User["用户端 Vue 应用"] -->|用户接口| Business
+    Infra --> Postgres["PostgreSQL 项目库"]
+    Infra --> Redis["Redis"]
+    Infra --> RustFS["RustFS (S3 API)"]
 ```
 
 两个前端应用共用一个 pnpm workspace，各自构建，按自身业务组织页面、组件和请求逻辑；跨端复用的无框架 HTTP 客户端、响应解包、401 单飞刷新与认证契约抽离在 `packages/api-client` 中，跨端共享常量与安全跳转等基础工具放在 `packages/shared` 中（显式子路径导出）。管理端（`apps/admin`）采用 `app -> features -> shared` 单向依赖的 Feature-based 分层：应用壳子、导航汇总（各 feature 通过 `menu.ts` 显式声明菜单项并配合 `RouteMeta.activeMenu` 处理子页高亮）与 `403`/`404` 异常页集中在 `app/`，业务模块按 `features/<domain>/` 组织，管理端的数据维护界面与用户端的播放界面保持独立演进，共用 workspace 管理工具链和锁文件。 [pnpm Workspace](https://pnpm.io/workspaces/)

@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.nep.tsuki.api.ApiResponse;
-import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.common.api.ApiResponse;
+import com.nep.tsuki.common.api.PageResult;
 import com.nep.tsuki.category.model.dto.CategoryBatchDeleteRequest;
 import com.nep.tsuki.category.model.dto.CategoryBatchStatusUpdateRequest;
 import com.nep.tsuki.category.model.dto.CategoryCreateRequest;

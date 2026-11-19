@@ -1,4 +1,4 @@
-package com.nep.tsuki.web;
+package com.nep.tsuki.common.web;
 
 import java.io.IOException;
 import java.util.UUID;

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.nep.tsuki.auth.model.dto.AuthenticatedAccount;
 import com.nep.tsuki.auth.service.AccountAuthenticateService;
-import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.common.exceptions.BusinessException;
 import com.nep.tsuki.user.constants.AccountApiCode;
 import com.nep.tsuki.user.mapper.UserAccountMapper;
 import com.nep.tsuki.user.model.entity.UserAccount;

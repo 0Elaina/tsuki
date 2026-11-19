@@ -14,8 +14,8 @@ import org.springframework.util.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.nep.tsuki.api.PageResult;
-import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.common.api.PageResult;
+import com.nep.tsuki.common.exceptions.BusinessException;
 import com.nep.tsuki.tag.constants.TagApiCode;
 import com.nep.tsuki.tag.mapper.TagMapper;
 import com.nep.tsuki.tag.model.dto.TagQuery;
@@ -23,7 +23,8 @@ import com.nep.tsuki.tag.model.entity.Tag;
 import com.nep.tsuki.tag.model.enums.TagStatus;
 import com.nep.tsuki.tag.model.vo.TagResponse;
 import com.nep.tsuki.tag.service.TagService;
-import com.nep.tsuki.utils.SqlUtils;
+import com.nep.tsuki.common.utils.SqlUtils;
+import com.nep.tsuki.infra.persistence.mybatis.MybatisPageAdapter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +82,7 @@ public class TagServiceImpl implements TagService {
      */
     @Override
     public PageResult<TagResponse> list(TagQuery query) {
-        Page<Tag> page = query.toPage();
+        Page<Tag> page = MybatisPageAdapter.toPage(query);
 
         LambdaQueryWrapper<Tag> wrapper = new LambdaQueryWrapper<>();
         if (query.getStatus() != null) {
@@ -92,7 +93,7 @@ public class TagServiceImpl implements TagService {
                     SqlUtils.toContainsLikePattern(query.getKeyword().strip().toLowerCase(Locale.ROOT)));
         }
         tagMapper.selectPage(page, wrapper.orderByAsc(Tag::getSortOrder).orderByAsc(Tag::getId));
-        return PageResult.from(page.convert(TagResponse::of));
+        return MybatisPageAdapter.toResult(page.convert(TagResponse::of));
     }
 
     /**

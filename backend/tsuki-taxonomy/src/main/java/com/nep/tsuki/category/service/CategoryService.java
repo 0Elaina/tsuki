@@ -2,7 +2,7 @@ package com.nep.tsuki.category.service;
 
 import java.util.List;
 
-import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.common.api.PageResult;
 import com.nep.tsuki.category.model.dto.CategoryQuery;
 import com.nep.tsuki.category.model.enums.CategoryStatus;
 import com.nep.tsuki.category.model.vo.CategoryResponse;

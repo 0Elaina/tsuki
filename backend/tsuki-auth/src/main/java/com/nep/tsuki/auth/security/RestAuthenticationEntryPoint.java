@@ -8,8 +8,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-import com.nep.tsuki.api.ApiCode;
-import com.nep.tsuki.api.ApiResponse;
+import com.nep.tsuki.common.api.ApiCode;
+import com.nep.tsuki.common.api.ApiResponse;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

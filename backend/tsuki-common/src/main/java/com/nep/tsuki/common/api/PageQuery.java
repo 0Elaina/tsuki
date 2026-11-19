@@ -1,7 +1,6 @@
-package com.nep.tsuki.api;
+package com.nep.tsuki.common.api;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.nep.tsuki.constants.PageConstants;
+import com.nep.tsuki.common.constants.PageConstants;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -20,10 +19,4 @@ public class PageQuery {
     @Max(value = PageConstants.MAX_PAGE_SIZE, message = "页大小不能超过 {value}")
     private Integer pageSize = PageConstants.DEFAULT_PAGE_SIZE;
 
-    public <T> Page<T> toPage() {
-        Integer cur = (page == null || page <= 0) ? 1 : page;
-        Integer size = (pageSize == null || pageSize <= 0) ? PageConstants.DEFAULT_PAGE_SIZE : pageSize;
-
-        return new Page<>(cur, size);
-    }
 }

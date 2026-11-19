@@ -1,4 +1,4 @@
-package com.nep.tsuki.api;
+package com.nep.tsuki.common.api;
 
 import org.springframework.http.HttpStatus;
 

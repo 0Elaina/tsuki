@@ -1,6 +1,6 @@
-package com.nep.tsuki.exceptions;
+package com.nep.tsuki.common.exceptions;
 
-import com.nep.tsuki.api.ApiCode;
+import com.nep.tsuki.common.api.ApiCode;
 
 import lombok.Getter;
 

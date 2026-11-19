@@ -19,7 +19,7 @@ import com.nep.tsuki.auth.model.enums.AccountType;
 import com.nep.tsuki.auth.security.RestAccessDeniedHandler;
 import com.nep.tsuki.auth.security.RestAuthenticationEntryPoint;
 import com.nep.tsuki.auth.utils.CookieUtils;
-import com.nep.tsuki.constants.EnvConstants;
+import com.nep.tsuki.common.constants.EnvConstants;
 
 import jakarta.servlet.DispatcherType;
 

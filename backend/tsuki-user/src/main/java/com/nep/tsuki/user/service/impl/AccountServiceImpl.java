@@ -2,7 +2,7 @@ package com.nep.tsuki.user.service.impl;
 
 import org.springframework.stereotype.Service;
 
-import com.nep.tsuki.exceptions.BusinessException;
+import com.nep.tsuki.common.exceptions.BusinessException;
 import com.nep.tsuki.user.constants.AccountApiCode;
 import com.nep.tsuki.user.mapper.UserAccountMapper;
 import com.nep.tsuki.user.model.entity.UserAccount;

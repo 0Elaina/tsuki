@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.nep.tsuki.api.ApiCode;
+import com.nep.tsuki.common.api.ApiCode;
 import com.nep.tsuki.auth.config.JwtProperties;
 import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.JwtConstants;
@@ -29,8 +29,8 @@ import com.nep.tsuki.auth.service.AuthService;
 import com.nep.tsuki.auth.service.AuthSessionService;
 import com.nep.tsuki.auth.service.LoginRateLimitService;
 import com.nep.tsuki.auth.service.TokenService;
-import com.nep.tsuki.exceptions.BusinessException;
-import com.nep.tsuki.utils.TimeUtils;
+import com.nep.tsuki.common.exceptions.BusinessException;
+import com.nep.tsuki.common.utils.TimeUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -83,11 +83,11 @@ public class AuthServiceImpl implements AuthService {
         Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
         Instant absExpiresAt = accountType == AccountType.ADMIN
-                ? now.plus(jwtProperties.refreshAdminAbsTtl())
-                : now.plus(jwtProperties.refreshUserAbsTtl());
+                ? now.plus(jwtProperties.getRefreshAdminAbsTtl())
+                : now.plus(jwtProperties.getRefreshUserAbsTtl());
         Duration refreshTtl = accountType == AccountType.ADMIN
-                ? jwtProperties.refreshAdminIdleTtl()
-                : jwtProperties.refreshUserIdleTtl();
+                ? jwtProperties.getRefreshAdminIdleTtl()
+                : jwtProperties.getRefreshUserIdleTtl();
         Instant refreshExpiresAt = TimeUtils.minInstant(now.plus(refreshTtl), absExpiresAt);
 
         IssuedTokens issuedTokens = tokenService.issue(accountType, authenticatedAccount.accountId(), sid, jti,
@@ -151,8 +151,8 @@ public class AuthServiceImpl implements AuthService {
         // 轮换签发令牌
         String newJti = UUID.randomUUID().toString();
         Duration refreshTtl = accountType == AccountType.ADMIN
-                ? jwtProperties.refreshAdminIdleTtl()
-                : jwtProperties.refreshUserIdleTtl();
+                ? jwtProperties.getRefreshAdminIdleTtl()
+                : jwtProperties.getRefreshUserIdleTtl();
         Instant refreshExpiresAt = TimeUtils.minInstant(now.plus(refreshTtl),
                 authSession.getAbsoluteExpiresAt().toInstant());
         IssuedTokens issuedTokens = tokenService.issue(accountType, accountId, authSession.getId(), newJti,

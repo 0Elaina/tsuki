@@ -28,14 +28,22 @@
 - `tsuki.auth.refresh-user-idle-ttl`（`TSUKI_AUTH_REFRESH_USER_IDLE_TTL`，默认 `7d`，至少 `1d`）
 - `tsuki.auth.refresh-user-abs-ttl`（`TSUKI_AUTH_REFRESH_USER_ABS_TTL`，默认 `30d`，至少 `1d`）
 
-Redis 连接参数在公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
+Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接由 `tsuki-infra` 引入自动装配，当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
+
+RustFS（S3 兼容对象存储）客户端由 `tsuki-infra` 装配，运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
+
+- `tsuki.s3.endpoint`（`TSUKI_S3_ENDPOINT`）：宿主机运行填 `http://127.0.0.1:9000`，共享网络内填 `http://rustfs:9000`
+- `tsuki.s3.region`（`TSUKI_S3_REGION`，默认 `us-east-1`）
+- `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`，建议填 Tsuki 的私有桶名 `tsuki-media`）
+- `tsuki.s3.access-key`（`TSUKI_S3_ACCESS_KEY`，本地复用共享 RustFS 访问密钥）
+- `tsuki.s3.secret-key`（`TSUKI_S3_SECRET_KEY`，本地复用共享 RustFS 对应密钥）
 
 ### 生产环境配置（prod profile）
 
 生产环境通过 `SPRING_PROFILES_ACTIVE=prod`（或 `--spring.profiles.active=prod`）激活 `prod` profile，支持通过环境变量或同目录下的 `config/application-prod.yml` 提供敏感配置：
 
-- 数据库连接：`TSUKI_DB_URL`、`TSUKI_DB_USERNAME`、`TSUKI_DB_PASSWORD`
-- 认证与 Redis：复用上述 `TSUKI_AUTH_*` 与 `TSUKI_REDIS_*` 环境变量
+- 数据库连接：`TSUKI_DB_URL`、`TSUKI_DB_USERNAME`、`TSUKI_DB_PASSWORD`（数据库驱动由 `tsuki-infra` 提供，数据源参数与 Flyway 迁移由 `tsuki-app` 管理）
+- 认证、Redis 与对象存储：复用上述 `TSUKI_AUTH_*`、`TSUKI_REDIS_*` 与 `TSUKI_S3_*` 环境变量
 - 反代与监听：`prod` 固定监听 `server.address: 127.0.0.1`，启用 `server.forward-headers-strategy: native`，并将 `server.tomcat.remoteip.internal-proxies` 限定为 `"127\\.0\\.0\\.1"`，由同机 HTTPS 反向代理终止 TLS 并转发真实客户端地址。
 
 ### 初始化管理员账号

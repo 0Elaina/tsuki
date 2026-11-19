@@ -52,6 +52,13 @@ tsuki:
     refresh-user-idle-ttl: "${TSUKI_AUTH_REFRESH_USER_IDLE_TTL:7d}"
     refresh-user-abs-ttl: "${TSUKI_AUTH_REFRESH_USER_ABS_TTL:30d}"
 
+  s3:
+    endpoint: "${TSUKI_S3_ENDPOINT:}"
+    region: "${TSUKI_S3_REGION:us-east-1}"
+    bucket: "${TSUKI_S3_BUCKET:}"
+    access-key: "${TSUKI_S3_ACCESS_KEY:}"
+    secret-key: "${TSUKI_S3_SECRET_KEY:}"
+
 ---
 spring:
   config:
