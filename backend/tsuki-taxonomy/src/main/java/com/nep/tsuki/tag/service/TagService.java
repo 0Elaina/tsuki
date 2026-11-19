@@ -2,7 +2,7 @@ package com.nep.tsuki.tag.service;
 
 import java.util.List;
 
-import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.common.api.PageResult;
 import com.nep.tsuki.tag.model.dto.TagQuery;
 import com.nep.tsuki.tag.model.enums.TagStatus;
 import com.nep.tsuki.tag.model.vo.TagResponse;

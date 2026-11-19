@@ -1,6 +1,6 @@
 package com.nep.tsuki.category.model.dto;
 
-import com.nep.tsuki.api.PageQuery;
+import com.nep.tsuki.common.api.PageQuery;
 import com.nep.tsuki.category.model.enums.CategoryStatus;
 
 import lombok.AllArgsConstructor;

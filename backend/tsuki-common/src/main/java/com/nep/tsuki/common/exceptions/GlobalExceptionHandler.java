@@ -1,4 +1,4 @@
-package com.nep.tsuki.exceptions;
+package com.nep.tsuki.common.exceptions;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,9 +20,9 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import com.nep.tsuki.api.ApiCode;
-import com.nep.tsuki.api.ApiResponse;
-import com.nep.tsuki.api.FieldError;
+import com.nep.tsuki.common.api.ApiCode;
+import com.nep.tsuki.common.api.ApiResponse;
+import com.nep.tsuki.common.api.FieldError;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;

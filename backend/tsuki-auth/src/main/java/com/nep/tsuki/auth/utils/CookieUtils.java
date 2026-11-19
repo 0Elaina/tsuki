@@ -8,7 +8,7 @@ import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
-import com.nep.tsuki.constants.EnvConstants;
+import com.nep.tsuki.common.constants.EnvConstants;
 
 import jakarta.servlet.http.HttpServletResponse;
 

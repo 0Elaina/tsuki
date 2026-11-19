@@ -1,4 +1,4 @@
-package com.nep.tsuki.utils;
+package com.nep.tsuki.common.utils;
 
 import java.time.Instant;
 

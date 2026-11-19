@@ -1,4 +1,4 @@
-package com.nep.tsuki.constants;
+package com.nep.tsuki.common.constants;
 
 public final class ZoneConstants {
     private ZoneConstants() {

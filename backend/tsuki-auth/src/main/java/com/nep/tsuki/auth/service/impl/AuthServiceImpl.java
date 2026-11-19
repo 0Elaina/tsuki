@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.nep.tsuki.api.ApiCode;
+import com.nep.tsuki.common.api.ApiCode;
 import com.nep.tsuki.auth.config.JwtProperties;
 import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.JwtConstants;
@@ -29,8 +29,8 @@ import com.nep.tsuki.auth.service.AuthService;
 import com.nep.tsuki.auth.service.AuthSessionService;
 import com.nep.tsuki.auth.service.LoginRateLimitService;
 import com.nep.tsuki.auth.service.TokenService;
-import com.nep.tsuki.exceptions.BusinessException;
-import com.nep.tsuki.utils.TimeUtils;
+import com.nep.tsuki.common.exceptions.BusinessException;
+import com.nep.tsuki.common.utils.TimeUtils;
 
 import lombok.extern.slf4j.Slf4j;
 

@@ -16,7 +16,7 @@ import com.nep.tsuki.auth.model.dto.IssuedTokens;
 import com.nep.tsuki.auth.model.enums.AccountType;
 import com.nep.tsuki.auth.model.enums.TokenType;
 import com.nep.tsuki.auth.service.TokenService;
-import com.nep.tsuki.utils.TimeUtils;
+import com.nep.tsuki.common.utils.TimeUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -14,7 +14,7 @@ import org.springframework.util.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.nep.tsuki.api.PageResult;
+import com.nep.tsuki.common.api.PageResult;
 import com.nep.tsuki.category.constants.CategoryApiCode;
 import com.nep.tsuki.category.mapper.CategoryMapper;
 import com.nep.tsuki.category.model.dto.CategoryQuery;
@@ -22,8 +22,9 @@ import com.nep.tsuki.category.model.entity.Category;
 import com.nep.tsuki.category.model.enums.CategoryStatus;
 import com.nep.tsuki.category.model.vo.CategoryResponse;
 import com.nep.tsuki.category.service.CategoryService;
-import com.nep.tsuki.exceptions.BusinessException;
-import com.nep.tsuki.utils.SqlUtils;
+import com.nep.tsuki.common.exceptions.BusinessException;
+import com.nep.tsuki.common.utils.SqlUtils;
+import com.nep.tsuki.infra.persistence.mybatis.MybatisPageAdapter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +82,7 @@ public class CategoryServiceImpl implements CategoryService {
      */
     @Override
     public PageResult<CategoryResponse> list(CategoryQuery query) {
-        Page<Category> page = query.toPage();
+        Page<Category> page = MybatisPageAdapter.toPage(query);
 
         LambdaQueryWrapper<Category> wrapper = new LambdaQueryWrapper<>();
         if (query.getStatus() != null) {
@@ -92,7 +93,7 @@ public class CategoryServiceImpl implements CategoryService {
                     SqlUtils.toContainsLikePattern(query.getKeyword().strip().toLowerCase(Locale.ROOT)));
         }
         categoryMapper.selectPage(page, wrapper.orderByAsc(Category::getSortOrder).orderByAsc(Category::getId));
-        return PageResult.from(page.convert(CategoryResponse::of));
+        return MybatisPageAdapter.toResult(page.convert(CategoryResponse::of));
     }
 
     /**
