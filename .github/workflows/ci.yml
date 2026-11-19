@@ -33,6 +33,12 @@ jobs:
             backend/**/pom.xml
             backend/.mvn/wrapper/maven-wrapper.properties
 
+      - name: Clear stale Maven failure markers
+        run: |
+          if [ -d "${HOME}/.m2/repository" ]; then
+            find "${HOME}/.m2/repository" -name "*.lastUpdated" -delete
+          fi
+
       - name: Verify backend
         working-directory: backend
         run: ./mvnw --batch-mode --no-transfer-progress verify
