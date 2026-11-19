@@ -8,13 +8,13 @@ Tsuki 是一个由个人独立开发和长期维护的在线音乐网站，参�
 
 - `tsuki-app`：负责应用启动、模块组装、Flyway 数据库迁移，以及数据源、Redis、MyBatis-Plus 和对象存储等运行参数配置。
 - `tsuki-infra`：集中管理 PostgreSQL 驱动、MyBatis-Plus 装配（分页拦截器、UTC 自动填充与公共分页适配器 `MybatisPageAdapter`）、Redis 自动装配以及 RustFS（`S3Client`）客户端配置；供启动模块装配及需要持久化或中间件能力的业务模块复用。
-- `tsuki-common`：仅提供统一响应、公共异常处理、Web 参数校验和解耦后的公共分页类型（`PageQuery`、`PageResult`），不依赖具体持久化或中间件框架。
-- 业务模块（如认证、用户、分类与标签等）：各自负责自己的 HTTP 接口、业务规则、实体与 Mapper 数据访问，并在 POM 中显式声明直接使用的依赖。跨模块调用通过公开接口进行，构建依赖可直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
+- `tsuki-common`：仅提供统一响应、公共异常处理、Web 参数校验、国家/地区代码校验及通用字符串工具和解耦后的公共分页类型（`PageQuery`、`PageResult`），不依赖具体持久化或中间件框架。
+- 业务模块（如认证、用户、分类与标签、艺人等）：各自负责自己的 HTTP 接口、业务规则、实体与 Mapper 数据访问，并在 POM 中显式声明直接使用的依赖。跨模块调用通过公开接口进行，构建依赖可直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
 
 ```mermaid
 flowchart LR
     subgraph Server["Spring Boot 后端进程"]
-        App["启动模块 (tsuki-app)"] -->|组装| Business["业务模块 (auth / user / taxonomy 等)"]
+        App["启动模块 (tsuki-app)"] -->|组装| Business["业务模块 (auth / user / taxonomy / artist 等)"]
         App -->|组装| Infra["基础设施模块 (tsuki-infra)"]
         Business -->|复用适配器| Infra
         Business --> Common["公共契约模块 (tsuki-common)"]
