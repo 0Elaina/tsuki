@@ -6,6 +6,7 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 | --- | --- | --- |
 | 400 | `VALIDATION_FAILED` | 请求参数校验失败 |
 | 400 | `BAD_REQUEST` | 请求格式不正确 |
+| 400 | `INVALID_COUNTRY_CODE` | 国家或地区代码无效 |
 | 401 | `UNAUTHENTICATED` | 未认证或凭据无效 |
 | 403 | `ACCESS_DENIED` | 无权限访问该资源 |
 | 404 | `NOT_FOUND` | 请求的资源不存在 |
@@ -46,3 +47,4 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 | 404 | `CATEGORY_NOT_FOUND` | 分类不存在 | `tsuki-taxonomy` |
 | 409 | `TAG_NAME_CONFLICT` | 标签名称已存在 | `tsuki-taxonomy` |
 | 404 | `TAG_NOT_FOUND` | 标签不存在 | `tsuki-taxonomy` |
+| 400 | `DUPLICATE_ARTIST_ALIAS` | 艺人别名不能重复 | `tsuki-artist` |
