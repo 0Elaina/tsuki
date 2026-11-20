@@ -28,10 +28,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
-          cache-dependency-path: |
-            backend/**/pom.xml
-            backend/.mvn/wrapper/maven-wrapper.properties
+
+      - name: Cache Maven
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: ${{ runner.os }}-maven-${{ hashFiles('backend/**/pom.xml', 'backend/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
       - name: Clear stale Maven failure markers
         run: |
@@ -39,9 +45,27 @@ jobs:
             find "${HOME}/.m2/repository" -name "*.lastUpdated" -delete
           fi
 
+      - name: Configure Maven mirror
+        run: |
+          mkdir -p "${HOME}/.m2"
+          cat << 'EOF' > "${HOME}/.m2/settings.xml"
+          <settings>
+            <mirrors>
+              <mirror>
+                <id>google-maven-central</id>
+                <name>Google Maven Central Mirror</name>
+                <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+                <mirrorOf>central</mirrorOf>
+              </mirror>
+            </mirrors>
+          </settings>
+          EOF
+
       - name: Verify backend
         working-directory: backend
-        run: ./mvnw --batch-mode --no-transfer-progress verify
+        env:
+          MVNW_REPOURL: https://maven-central.storage-download.googleapis.com/maven2
+        run: ./mvnw --batch-mode --no-transfer-progress -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.interval=5000 verify
 
   frontend:
     runs-on: ubuntu-24.04
