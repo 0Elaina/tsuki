@@ -12,4 +12,7 @@ public final class ArtistApiCode {
                         "DUPLICATE_ARTIST_ALIAS",
                         "艺人别名不能重复");
 
+        public static final ApiCode INVALID_ARTIST_DEBUT_YEAR = new ApiCode(HttpStatus.BAD_REQUEST,
+                        "INVALID_ARTIST_DEBUT_YEAR", "艺人出道年份无效");
+
 }
