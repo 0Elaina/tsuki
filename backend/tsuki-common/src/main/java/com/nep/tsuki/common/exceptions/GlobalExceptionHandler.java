@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.nep.tsuki.common.api.ApiCode;
@@ -53,6 +54,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             errors.putIfAbsent(field, Objects.requireNonNullElse(violation.getMessage(), DEFAULT_VALIDATION_MESSAGE));
         }
         return ResponseEntity.status(ApiCode.VALIDATION_FAILED.httpStatus()).body(validationError(errors));
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException(MultipartException exception) {
+        return ResponseEntity.status(ApiCode.BAD_REQUEST.httpStatus())
+                .body(ApiResponse.error(ApiCode.BAD_REQUEST));
     }
 
     @ExceptionHandler(Exception.class)
@@ -105,6 +112,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case 400 -> ApiCode.BAD_REQUEST;
             case 404 -> ApiCode.NOT_FOUND;
             case 405 -> ApiCode.METHOD_NOT_ALLOWED;
+            case 413 -> ApiCode.PAYLOAD_TOO_LARGE;
             case 415 -> ApiCode.UNSUPPORTED_MEDIA_TYPE;
             default -> ApiCode.REQUEST_FAILED;
         });
