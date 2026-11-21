@@ -22,6 +22,18 @@ public class S3MediaStorageClient {
     private final PublicMediaStorageProperties publicMediaStorageProperties;
 
     /**
+     * 使用对应存储空间的默认缓存策略上传媒体对象
+     *
+     * @param storageSpace 媒体存储空间
+     * @param objectKey    媒体对象键
+     * @param bytes        媒体对象字节数组
+     * @param contentType  媒体对象内容类型
+     */
+    public void putObject(MediaStorageSpace storageSpace, String objectKey, byte[] bytes, String contentType) {
+        putObject(storageSpace, objectKey, bytes, contentType, resolveCacheControl(storageSpace));
+    }
+
+    /**
      * 上传媒体对象
      *
      * @param storageSpace 媒体存储空间
@@ -75,6 +87,12 @@ public class S3MediaStorageClient {
     private String resolvePublicBaseUrl(MediaStorageSpace storageSpace) {
         return switch (storageSpace) {
             case PUBLIC_MEDIA -> publicMediaStorageProperties.getPublicBaseUrl();
+        };
+    }
+
+    private String resolveCacheControl(MediaStorageSpace storageSpace) {
+        return switch (storageSpace) {
+            case PUBLIC_MEDIA -> publicMediaStorageProperties.getCacheControl();
         };
     }
 }

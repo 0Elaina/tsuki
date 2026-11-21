@@ -11,4 +11,6 @@ public final class MediaConstants {
     public static final String IMAGE_WEBP_VALUE = "image/webp";
     public static final List<String> SUPPORTED_IMAGE_TYPES = List.of(MediaType.IMAGE_JPEG_VALUE,
             MediaType.IMAGE_PNG_VALUE, IMAGE_WEBP_VALUE);
+
+    public static final String BASE_IMAGE_PREFIX = "base-";
 }

@@ -49,7 +49,7 @@ COMMENT ON COLUMN media_variants.id IS '主键 ID';
 COMMENT ON COLUMN media_variants.asset_id IS '所属媒体资源 ID（引用 media_assets.id）';
 COMMENT ON COLUMN media_variants.code IS '交付规格枚举名称：BASE=基础原图规格';
 COMMENT ON COLUMN media_variants.storage_space IS '逻辑存储空间枚举名称：PUBLIC_MEDIA=公开媒体空间';
-COMMENT ON COLUMN media_variants.object_key IS '对象存储键，如 tsuki/images/{assetId}/{uuid}/base.png';
+COMMENT ON COLUMN media_variants.object_key IS '对象存储键';
 COMMENT ON COLUMN media_variants.content_type IS '实际输出 MIME 类型，如 image/jpeg、image/png';
 COMMENT ON COLUMN media_variants.byte_size IS '文件字节大小，必须为正数';
 COMMENT ON COLUMN media_variants.width IS '输出图像宽度（像素），与 height 同为空或同为正数';

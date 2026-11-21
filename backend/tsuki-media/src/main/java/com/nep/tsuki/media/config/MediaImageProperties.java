@@ -6,6 +6,7 @@ import org.springframework.validation.annotation.Validated;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,6 +15,9 @@ import lombok.Setter;
 @Validated
 @ConfigurationProperties(prefix = "tsuki.media.image")
 public class MediaImageProperties {
+    @NotBlank(message = "图片对象键前缀不能为空")
+    private String keyPrefix = "tsuki/images/";
+
     @Min(value = 1, message = "图片单边最大像素必须大于 0")
     private int maxDimension = 6144;
 

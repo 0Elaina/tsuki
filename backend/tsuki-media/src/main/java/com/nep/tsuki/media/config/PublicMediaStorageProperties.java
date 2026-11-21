@@ -17,4 +17,7 @@ public class PublicMediaStorageProperties {
 
     @NotBlank(message = "公开媒体基地址不能为空")
     private String publicBaseUrl;
+
+    @NotBlank(message = "公开媒体缓存控制头不能为空")
+    private String cacheControl = "public, max-age=300";
 }

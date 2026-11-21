@@ -72,7 +72,12 @@ tsuki:
       public-media:
         bucket: "${TSUKI_MEDIA_PUBLIC_BUCKET:}"
         public-base-url: "${TSUKI_MEDIA_PUBLIC_BASE_URL:}"
+        cache-control: "${TSUKI_MEDIA_PUBLIC_CACHE_CONTROL:public, max-age=300}"
+    lifecycle:
+      uploading-ttl: "${TSUKI_MEDIA_UPLOADING_TTL:15m}"
+      available-ttl: "${TSUKI_MEDIA_AVAILABLE_TTL:24h}"
     image:
+      key-prefix: "${TSUKI_MEDIA_IMAGE_KEY_PREFIX:tsuki/images/}"
       max-dimension: "${TSUKI_MEDIA_IMAGE_MAX_DIMENSION:6144}"
       max-pixels: "${TSUKI_MEDIA_IMAGE_MAX_PIXELS:25000000}"
       jpeg-quality: "${TSUKI_MEDIA_IMAGE_JPEG_QUALITY:0.85}"
