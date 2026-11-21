@@ -26,6 +26,8 @@ CREATE TABLE media_variants (
     byte_size BIGINT NOT NULL,
     width INTEGER,
     height INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_media_variants PRIMARY KEY (id),
     CONSTRAINT fk_media_variants_media_assets FOREIGN KEY (asset_id) REFERENCES media_assets (id) ON DELETE CASCADE,
     CONSTRAINT uk_media_variants_asset_id_code UNIQUE (asset_id, code),
@@ -52,6 +54,8 @@ COMMENT ON COLUMN media_variants.content_type IS '实际输出 MIME 类型，如
 COMMENT ON COLUMN media_variants.byte_size IS '文件字节大小，必须为正数';
 COMMENT ON COLUMN media_variants.width IS '输出图像宽度（像素），与 height 同为空或同为正数';
 COMMENT ON COLUMN media_variants.height IS '输出图像高度（像素），与 width 同为空或同为正数';
+COMMENT ON COLUMN media_variants.created_at IS '创建时间（UTC 带时区时间戳）';
+COMMENT ON COLUMN media_variants.updated_at IS '最后更新时间（UTC 带时区时间戳）';
 ALTER TABLE artists DROP CONSTRAINT ck_artists_country_code,
     DROP COLUMN country_code,
     DROP COLUMN disambiguation,

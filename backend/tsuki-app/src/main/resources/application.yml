@@ -65,11 +65,17 @@ tsuki:
     bucket: "${TSUKI_S3_BUCKET:}"
     access-key: "${TSUKI_S3_ACCESS_KEY:}"
     secret-key: "${TSUKI_S3_SECRET_KEY:}"
+    api-call-timeout: "${TSUKI_S3_API_CALL_TIMEOUT:10s}"
+    api-call-attempt-timeout: "${TSUKI_S3_API_CALL_ATTEMPT_TIMEOUT:3s}"
   media:
     storage:
       public-media:
         bucket: "${TSUKI_MEDIA_PUBLIC_BUCKET:}"
         public-base-url: "${TSUKI_MEDIA_PUBLIC_BASE_URL:}"
+    image:
+      max-dimension: "${TSUKI_MEDIA_IMAGE_MAX_DIMENSION:6144}"
+      max-pixels: "${TSUKI_MEDIA_IMAGE_MAX_PIXELS:25000000}"
+      jpeg-quality: "${TSUKI_MEDIA_IMAGE_JPEG_QUALITY:0.85}"
 
 ---
 spring:

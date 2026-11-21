@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -17,11 +18,16 @@ public class S3ClientConfig {
         // 构造静态凭据
         AwsBasicCredentials credentials = AwsBasicCredentials.create(s3Properties.getAccessKey(),
                 s3Properties.getSecretKey());
+        ClientOverrideConfiguration overrideConfiguration = ClientOverrideConfiguration.builder()
+                .apiCallTimeout(s3Properties.getApiCallTimeout())
+                .apiCallAttemptTimeout(s3Properties.getApiCallAttemptTimeout())
+                .build();
         return S3Client.builder()
                 .endpointOverride(s3Properties.getEndpoint())
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .region(Region.of(s3Properties.getRegion()))
                 .forcePathStyle(true)
+                .overrideConfiguration(overrideConfiguration)
                 .build();
     }
 }
