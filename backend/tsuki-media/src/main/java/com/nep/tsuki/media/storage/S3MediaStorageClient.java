@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Slf4j
@@ -76,6 +77,26 @@ public class S3MediaStorageClient {
         String trimmedPath = pathOrObjectKey.strip();
         String normalizedPath = trimmedPath.startsWith("/") ? trimmedPath : "/" + trimmedPath;
         return baseUrl + normalizedPath;
+    }
+
+    /**
+     * 删除对象
+     * 
+     * @param storageSpace 媒体存储空间
+     * @param objectKey    对象键
+     */
+    public void deleteObject(MediaStorageSpace storageSpace, String objectKey) {
+        String bucket = resolveBucket(storageSpace);
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+        try {
+            s3Client.deleteObject(request);
+        } catch (SdkException ex) {
+            log.error("删除媒体对象失败: bucket={}, objectKey={}", bucket, objectKey, ex);
+            throw new BusinessException(MediaApiCode.MEDIA_STORAGE_UNAVAILABLE);
+        }
     }
 
     private String resolveBucket(MediaStorageSpace storageSpace) {

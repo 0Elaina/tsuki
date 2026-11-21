@@ -76,6 +76,9 @@ tsuki:
     lifecycle:
       uploading-ttl: "${TSUKI_MEDIA_UPLOADING_TTL:15m}"
       available-ttl: "${TSUKI_MEDIA_AVAILABLE_TTL:24h}"
+      cleanup-batch-size: "${TSUKI_MEDIA_CLEANUP_BATCH_SIZE:5}"
+      cleanup-retry-delay: "${TSUKI_MEDIA_CLEANUP_RETRY_DELAY:5m}"
+      cleanup-fixed-delay: "${TSUKI_MEDIA_CLEANUP_FIXED_DELAY:60s}"
     image:
       key-prefix: "${TSUKI_MEDIA_IMAGE_KEY_PREFIX:tsuki/images/}"
       max-dimension: "${TSUKI_MEDIA_IMAGE_MAX_DIMENSION:6144}"
