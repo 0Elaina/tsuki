@@ -22,6 +22,8 @@ public record ApiCode(
                         "未认证或凭据无效");
         public static final ApiCode PAYLOAD_TOO_LARGE = new ApiCode(HttpStatus.CONTENT_TOO_LARGE, "PAYLOAD_TOO_LARGE",
                         "请求内容过大");
+        public static final ApiCode INVALID_URL = new ApiCode(HttpStatus.BAD_REQUEST,
+                        "INVALID_URL", "URL 格式无效");
         public static final ApiCode INVALID_COUNTRY_CODE = new ApiCode(HttpStatus.BAD_REQUEST,
                         "INVALID_COUNTRY_CODE", "国家或地区代码无效");
         public static final ApiCode ACCESS_DENIED = new ApiCode(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "无权限访问该资源");

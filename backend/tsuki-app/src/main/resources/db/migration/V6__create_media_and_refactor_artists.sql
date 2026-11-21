@@ -91,6 +91,8 @@ CREATE TABLE artist_profiles (
     biography TEXT,
     debut_year SMALLINT,
     official_website_url VARCHAR(2048),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_artist_profiles PRIMARY KEY (artist_id),
     CONSTRAINT fk_artist_profiles_artists FOREIGN KEY (artist_id) REFERENCES artists (id) ON DELETE CASCADE,
     CONSTRAINT ck_artist_profiles_non_empty CHECK (
@@ -122,3 +124,5 @@ COMMENT ON COLUMN artist_profiles.country_code IS '主要关联国家或地区�
 COMMENT ON COLUMN artist_profiles.biography IS '艺人纯文本简介';
 COMMENT ON COLUMN artist_profiles.debut_year IS '出道年份（1 至 9999）';
 COMMENT ON COLUMN artist_profiles.official_website_url IS '艺人官方网站 HTTP/HTTPS 地址';
+COMMENT ON COLUMN artist_profiles.created_at IS '创建时间（UTC 带时区时间戳）';
+COMMENT ON COLUMN artist_profiles.updated_at IS '最后更新时间（UTC 带时区时间戳）';
