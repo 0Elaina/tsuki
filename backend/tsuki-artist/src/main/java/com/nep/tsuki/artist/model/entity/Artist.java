@@ -21,9 +21,8 @@ public class Artist {
     private String name;
     private String sortName;
     private String type;
-    private String countryCode;
-    private String disambiguation;
-    private String biography;
+    private Long avatarAssetId;
+    private String avatarUrl;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;
