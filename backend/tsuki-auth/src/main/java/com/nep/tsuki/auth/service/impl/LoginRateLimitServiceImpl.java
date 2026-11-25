@@ -3,7 +3,6 @@ package com.nep.tsuki.auth.service.impl;
 import java.util.List;
 import java.util.Locale;
 
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -24,8 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class LoginRateLimitServiceImpl implements LoginRateLimitService {
     private final StringRedisTemplate stringRedisTemplate;
-    private static final RedisScript<Long> RATE_LIMIT_SCRIPT = RedisScript
-            .of(new ClassPathResource("lua/login_rate_limit.lua"), Long.class);
+    private final RedisScript<Long> fixedWindowRateLimitScript;
 
     /**
      * 检查并消耗登录次数
@@ -47,7 +45,7 @@ public class LoginRateLimitServiceImpl implements LoginRateLimitService {
 
     private void consumeQuota(String key, long maxAttempts) {
         try {
-            Long remainingMillis = stringRedisTemplate.execute(RATE_LIMIT_SCRIPT, List.of(key),
+            Long remainingMillis = stringRedisTemplate.execute(fixedWindowRateLimitScript, List.of(key),
                     String.valueOf(maxAttempts), String.valueOf(AuthRedisConstants.LOGIN_WINDOW_MILLIS));
             if (remainingMillis == null) {
                 throw new BusinessException(AuthApiCode.LOGIN_UNAVAILABLE);

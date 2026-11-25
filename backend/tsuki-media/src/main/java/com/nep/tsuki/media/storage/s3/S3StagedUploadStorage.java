@@ -126,18 +126,19 @@ public class S3StagedUploadStorage implements StagedUploadStorage {
     /**
      * 查询暂存对象的元数据
      *
-     * @param key 暂存对象键
+     * @param objectKey 数据库保存的完整暂存对象键
      * @return 若对象存在则返回其元数据，否则返回 {@link Optional#empty()}
      */
     @Override
-    public Optional<StagedObjectMetadata> find(StagingObjectKey key) {
-        // 校验入参非空
-        Objects.requireNonNull(key, "key 不能为空");
+    public Optional<StagedObjectMetadata> find(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            throw new IllegalArgumentException("objectKey 不能为空");
+        }
 
         // 构建 S3 HEAD 请求（仅获取元数据，不下载文件内容）
         HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
                 .bucket(s3Properties.getBucket())
-                .key(key.value())
+                .key(objectKey)
                 .build();
 
         try {
