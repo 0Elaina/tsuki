@@ -20,5 +20,5 @@
 - 固定上限的短文本使用 `VARCHAR(n)`，密码哈希及长文本使用 `TEXT`。
 - 创建和更新时间字段统一使用 `TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`，Java 实体映射为 `OffsetDateTime`，配合公共模块 `MybatisPlusConfig` 的 `MetaObjectHandler` 或数据库默认值填充。
 - 状态、角色等枚举字段按普通字符串（`VARCHAR`）存储，不在数据库编写枚举 `CHECK` 约束或硬编码状态默认值；值域、默认值与校验统一由业务层 Java 枚举维护，实体与接口契约中均以普通 `String` 表达。
-- 所有表和字段在迁移脚本中通过 `COMMENT ON` 补充中文说明，枚举字段需写明取值映射，并与数据库设计文档保持一致。
+- 迁移脚本使用 `COMMENT ON` 说明表和字段的业务含义。字符串枚举的值域由 Java 枚举维护，数据库设计文档按需说明。采用整数编码的枚举在 SQL 注释和数据库设计文档中列出完整映射。
 

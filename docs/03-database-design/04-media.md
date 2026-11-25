@@ -6,7 +6,7 @@
 
 **字段**
 
-| 字段名 | 类型 | 约束(PK/FK/UNIQUE/NOT NULL/DEFAULT) | 说明（枚举须写全映射） |
+| 字段名 | 类型 | 约束(PK/FK/UNIQUE/NOT NULL/DEFAULT) | 说明 |
 | --- | --- | --- | --- |
 | id | BIGINT | PK, GENERATED ALWAYS AS IDENTITY, NOT NULL | 主键 ID |
 | uploader_account_id | BIGINT | FK, NOT NULL | 签发与上传所属账号 ID，外键引用 `user_accounts.id` |
