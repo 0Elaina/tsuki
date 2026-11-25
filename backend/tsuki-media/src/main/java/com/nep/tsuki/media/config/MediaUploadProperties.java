@@ -25,4 +25,10 @@ public class MediaUploadProperties {
 
     @Positive(message = "图片最大字节数必须大于 0")
     private long maxImageBytes = 10_485_760L;
+
+    @Positive(message = "管理端签发限额必须大于 0")
+    private long adminSignLimit = 60L;
+
+    @Positive(message = "用户端签发限额必须大于 0")
+    private long userSignLimit = 10L;
 }
