@@ -37,16 +37,6 @@ RustFS（S3 兼容对象存储）客户端由 `tsuki-infra` 装配，运行参�
 - `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`，建议填 Tsuki 的私有桶名 `tsuki-media`）
 - `tsuki.s3.access-key`（`TSUKI_S3_ACCESS_KEY`，本地复用共享 RustFS 访问密钥）
 - `tsuki.s3.secret-key`（`TSUKI_S3_SECRET_KEY`，本地复用共享 RustFS 对应密钥）
-- `tsuki.s3.api-call-timeout`（`TSUKI_S3_API_CALL_TIMEOUT`，默认 `10s`）
-- `tsuki.s3.api-call-attempt-timeout`（`TSUKI_S3_API_CALL_ATTEMPT_TIMEOUT`，默认 `3s`）
-
-`tsuki-media` 通过逻辑空间映射公开媒体存储，需在 `tsuki-app` 中提供以下非空配置（生命周期与图片规格阈值均带默认值）：
-
-- `tsuki.media.storage.public-media.bucket`（`TSUKI_MEDIA_PUBLIC_BUCKET`，对应逻辑空间 `PUBLIC_MEDIA`，如 `tsuki-public-media`；该桶仅开放 `tsuki/images/*` 路径前缀的匿名只读策略）
-- `tsuki.media.storage.public-media.public-base-url`（`TSUKI_MEDIA_PUBLIC_BASE_URL`，公开访问基地址，开发环境填 `http://127.0.0.1:9000/tsuki-public-media`）
-- `tsuki.media.storage.public-media.cache-control`（`TSUKI_MEDIA_PUBLIC_CACHE_CONTROL`，默认 `public, max-age=300`）
-- `tsuki.media.lifecycle.*`（`TSUKI_MEDIA_UPLOADING_TTL` 默认 `15m`、`TSUKI_MEDIA_AVAILABLE_TTL` 默认 `24h`、`TSUKI_MEDIA_CLEANUP_BATCH_SIZE` 默认 `5`、`TSUKI_MEDIA_CLEANUP_RETRY_DELAY` 默认 `5m`、`TSUKI_MEDIA_CLEANUP_FIXED_DELAY` 默认 `60s`）
-- `tsuki.media.image.*`（`TSUKI_MEDIA_IMAGE_KEY_PREFIX` 默认 `tsuki/images/`、`TSUKI_MEDIA_IMAGE_MAX_DIMENSION` 默认 `6144`、`TSUKI_MEDIA_IMAGE_MAX_PIXELS` 默认 `25000000`、`TSUKI_MEDIA_IMAGE_JPEG_QUALITY` 默认 `0.85`）
 
 ### 生产环境配置（prod profile）
 

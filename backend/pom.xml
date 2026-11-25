@@ -20,8 +20,6 @@
 		<module>tsuki-auth</module>
 		<module>tsuki-taxonomy</module>
 		<module>tsuki-infra</module>
-		<module>tsuki-artist</module>
-		<module>tsuki-media</module>
 	</modules>
 	<name>tsuki-parent</name>
 
@@ -30,8 +28,6 @@
 		<spring-boot.run.skip>true</spring-boot.run.skip>
 		<mybatis-plus.version>3.5.17</mybatis-plus.version>
 		<aws-s3.version>2.55.12</aws-s3.version>
-		<thumbnailator.version>0.4.21</thumbnailator.version>
-		<twelvemonkeys.version>3.15.3</twelvemonkeys.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -66,16 +62,6 @@
 				<artifactId>tsuki-infra</artifactId>
 				<version>${project.version}</version>
 			</dependency>
-			<dependency>
-				<groupId>com.nep.tsuki</groupId>
-				<artifactId>tsuki-artist</artifactId>
-				<version>${project.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.nep.tsuki</groupId>
-				<artifactId>tsuki-media</artifactId>
-				<version>${project.version}</version>
-			</dependency>
 
 
 			<!-- MyBatis-Plus (适配 Spring Boot 4.x) -->
@@ -106,18 +92,6 @@
 				<groupId>software.amazon.awssdk</groupId>
 				<artifactId>s3</artifactId>
 				<version>${aws-s3.version}</version>
-			</dependency>
-
-			<!-- 图片处理与 WebP 解码 -->
-			<dependency>
-				<groupId>net.coobird</groupId>
-				<artifactId>thumbnailator</artifactId>
-				<version>${thumbnailator.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.twelvemonkeys.imageio</groupId>
-				<artifactId>imageio-webp</artifactId>
-				<version>${twelvemonkeys.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
