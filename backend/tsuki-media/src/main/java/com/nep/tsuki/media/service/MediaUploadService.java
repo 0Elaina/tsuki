@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.dao.DataAccessException;
@@ -13,6 +14,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.nep.tsuki.common.api.ApiCode;
 import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.common.exceptions.BusinessException;
@@ -22,12 +25,14 @@ import com.nep.tsuki.media.constants.MediaRedisConstants;
 import com.nep.tsuki.media.mapper.MediaAssetMapper;
 import com.nep.tsuki.media.model.dto.IssuedMediaUpload;
 import com.nep.tsuki.media.model.dto.PresignedImageUpload;
+import com.nep.tsuki.media.model.dto.StagedObjectMetadata;
 import com.nep.tsuki.media.model.dto.StagingObjectKey;
 import com.nep.tsuki.media.model.entity.MediaAsset;
 import com.nep.tsuki.media.model.enums.ImageContentType;
 import com.nep.tsuki.media.model.enums.MediaAssetStatus;
 import com.nep.tsuki.media.model.enums.MediaKind;
 import com.nep.tsuki.media.storage.StagedUploadStorage;
+import com.nep.tsuki.media.utils.MediaUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,6 +115,82 @@ public class MediaUploadService {
     }
 
     /**
+     * 校验暂存区对象元数据并确认图片上传完成
+     *
+     * @param assetId           媒体资产 ID
+     * @param uploaderAccountId 上传者账号 ID
+     */
+    public void confirmImageUpload(long assetId, long uploaderAccountId) {
+        // 校验基础参数合法性
+        if (assetId <= 0L) {
+            throw new IllegalArgumentException("assetId 必须大于 0");
+        }
+        if (uploaderAccountId <= 0L) {
+            throw new IllegalArgumentException("uploaderAccountId 必须大于 0");
+        }
+
+        // 查询归属当前账号的媒体资产，已确认则幂等返回，已过期则拒绝确认
+        MediaAsset mediaAsset = mediaAssetMapper.selectOne(new LambdaQueryWrapper<MediaAsset>()
+                .eq(MediaAsset::getId, assetId)
+                .eq(MediaAsset::getUploaderAccountId, uploaderAccountId));
+        if (mediaAsset == null) {
+            throw new BusinessException(ApiCode.NOT_FOUND);
+        }
+        if (mediaAsset.getConfirmedAt() != null) {
+            log.debug("同账号重复确认, 幂等跳过: assetId={}, accountId={}", mediaAsset.getId(), uploaderAccountId);
+            return;
+        }
+        OffsetDateTime checkTime = OffsetDateTime.now(ZoneOffset.UTC);
+        if (!mediaAsset.getConfirmExpiresAt().isAfter(checkTime)) {
+            throw new BusinessException(MediaApiCode.MEDIA_UPLOAD_EXPIRED);
+        }
+
+        // 查询对象存储实际元数据，校验文件是否存在以及大小、MIME 类型是否与签发时一致
+        Optional<StagedObjectMetadata> metadataOptional = stagedUploadStorage.find(mediaAsset.getObjectKey());
+        if (metadataOptional.isEmpty()) {
+            throw new BusinessException(MediaApiCode.MEDIA_UPLOAD_OBJECT_MISSING);
+        }
+        StagedObjectMetadata metadata = metadataOptional.get();
+        if (metadata.byteSize() != mediaAsset.getByteSize()
+                || !MediaUtils.isSameMediaType(mediaAsset.getContentType(), metadata.contentType())) {
+            throw new BusinessException(MediaApiCode.MEDIA_UPLOAD_METADATA_MISMATCH);
+        }
+
+        // 基于乐观条件（未确认且未过期）原子更新资产状态与 ETag
+        OffsetDateTime confirmedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        int updatedRows = mediaAssetMapper.update(null, new LambdaUpdateWrapper<MediaAsset>()
+                .eq(MediaAsset::getId, assetId)
+                .eq(MediaAsset::getUploaderAccountId, uploaderAccountId)
+                .eq(MediaAsset::getStatus, MediaAssetStatus.PENDING_UPLOAD.name())
+                .isNull(MediaAsset::getConfirmedAt)
+                .gt(MediaAsset::getConfirmExpiresAt, confirmedAt)
+                .set(MediaAsset::getStatus, MediaAssetStatus.UPLOAD_CONFIRMED.name())
+                .set(MediaAsset::getConfirmedAt, confirmedAt)
+                .set(MediaAsset::getEtag, metadata.eTag())
+                .set(MediaAsset::getUpdatedAt, confirmedAt));
+        if (updatedRows == 1) {
+            log.info("确认图片上传成功: assetId={}, uploaderAccountId={}, byteSize={}", assetId, uploaderAccountId,
+                    metadata.byteSize());
+            return;
+        }
+
+        // 并发更新未命中时回查最新状态，区分并发幂等成功、临界过期或异常状态
+        MediaAsset latestAsset = mediaAssetMapper.selectOne(new LambdaQueryWrapper<MediaAsset>()
+                .eq(MediaAsset::getId, assetId)
+                .eq(MediaAsset::getUploaderAccountId, uploaderAccountId));
+        if (latestAsset == null) {
+            throw new BusinessException(ApiCode.NOT_FOUND);
+        }
+        if (latestAsset.getConfirmedAt() != null) {
+            return;
+        }
+        if (!latestAsset.getConfirmExpiresAt().isAfter(confirmedAt)) {
+            throw new BusinessException(MediaApiCode.MEDIA_UPLOAD_EXPIRED);
+        }
+        throw new IllegalStateException("媒体资产状态异常, 无法完成确认: assetId=" + assetId + ", status=" + latestAsset.getStatus());
+    }
+
+    /**
      * 校验并扣减指定账号在当前时间窗口内的媒体上传签名配额
      *
      * @param uploaderAccountId 上传者账号 ID
@@ -149,4 +230,5 @@ public class MediaUploadService {
             throw new BusinessException(MediaApiCode.MEDIA_UPLOAD_LIMIT_UNAVAILABLE);
         }
     }
+
 }
