@@ -13,12 +13,12 @@ import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.infra.storage.s3.S3Properties;
 import com.nep.tsuki.media.config.MediaUploadProperties;
-import com.nep.tsuki.media.storage.ImageContentType;
-import com.nep.tsuki.media.storage.MediaKind;
-import com.nep.tsuki.media.storage.PresignedImageUpload;
+import com.nep.tsuki.media.model.dto.PresignedImageUpload;
+import com.nep.tsuki.media.model.dto.StagedObjectMetadata;
+import com.nep.tsuki.media.model.dto.StagingObjectKey;
+import com.nep.tsuki.media.model.enums.ImageContentType;
+import com.nep.tsuki.media.model.enums.MediaKind;
 import com.nep.tsuki.media.storage.StagedUploadStorage;
-import com.nep.tsuki.media.storage.StagedObjectMetadata;
-import com.nep.tsuki.media.storage.StagingObjectKey;
 
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;

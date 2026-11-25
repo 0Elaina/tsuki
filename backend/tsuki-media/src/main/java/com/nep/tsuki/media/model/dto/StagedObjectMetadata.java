@@ -1,4 +1,4 @@
-package com.nep.tsuki.media.storage;
+package com.nep.tsuki.media.model.dto;
 
 /**
  * 暂存对象的元数据

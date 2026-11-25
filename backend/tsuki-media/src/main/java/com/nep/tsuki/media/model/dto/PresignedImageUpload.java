@@ -1,4 +1,4 @@
-package com.nep.tsuki.media.storage;
+package com.nep.tsuki.media.model.dto;
 
 import java.net.URI;
 import java.time.Instant;

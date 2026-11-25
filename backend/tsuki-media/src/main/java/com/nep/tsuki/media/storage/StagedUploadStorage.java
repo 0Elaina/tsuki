@@ -2,6 +2,10 @@ package com.nep.tsuki.media.storage;
 
 import java.util.Optional;
 
+import com.nep.tsuki.media.model.dto.PresignedImageUpload;
+import com.nep.tsuki.media.model.dto.StagedObjectMetadata;
+import com.nep.tsuki.media.model.dto.StagingObjectKey;
+
 /**
  * 暂存区上传存储接口（用于管理客户端直传的临时对象）
  */
