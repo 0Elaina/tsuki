@@ -15,7 +15,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.auth.security.RestAccessDeniedHandler;
 import com.nep.tsuki.auth.security.RestAuthenticationEntryPoint;
 import com.nep.tsuki.auth.utils.CookieUtils;

@@ -1,7 +1,7 @@
 package com.nep.tsuki.auth.service;
 
 import com.nep.tsuki.auth.model.dto.IssuedTokens;
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 
 public interface AuthService {
     /**
