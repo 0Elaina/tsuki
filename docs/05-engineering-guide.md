@@ -30,13 +30,25 @@
 
 Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接由 `tsuki-infra` 引入自动装配，当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
 
-RustFS（S3 兼容对象存储）客户端由 `tsuki-infra` 装配，运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
+RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-infra` 装配（强制路径风格访问），运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
 
-- `tsuki.s3.endpoint`（`TSUKI_S3_ENDPOINT`）：宿主机运行填 `http://127.0.0.1:9000`，共享网络内填 `http://rustfs:9000`
+- `tsuki.s3.endpoint`（`TSUKI_S3_ENDPOINT`）：后端内部调用的 HTTP(S) 根地址（含主机、无凭据、无查询参数、无片段、无子路径）；宿主机运行填 `http://127.0.0.1:9000`，共享网络内填 `http://rustfs:9000`
+- `tsuki.s3.upload-endpoint`（`TSUKI_S3_UPLOAD_ENDPOINT`）：浏览器直传预签名 URL 使用的 HTTP(S) 根地址（约束同上）；本地联调填宿主机可达地址 `http://127.0.0.1:9000`，生产填独立上传域名
 - `tsuki.s3.region`（`TSUKI_S3_REGION`，默认 `us-east-1`）
-- `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`，建议填 Tsuki 的私有桶名 `tsuki-media`）
-- `tsuki.s3.access-key`（`TSUKI_S3_ACCESS_KEY`，本地复用共享 RustFS 访问密钥）
-- `tsuki.s3.secret-key`（`TSUKI_S3_SECRET_KEY`，本地复用共享 RustFS 对应密钥）
+- `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`）：项目私有桶名，本地 `dev` 填 `tsuki-dev-media-private`（生产使用 `tsuki-prod-media-private`）
+- `tsuki.s3.access-key`（`TSUKI_S3_ACCESS_KEY`，本地复用共享 RustFS 访问密钥，生产可换用最小权限凭证）
+- `tsuki.s3.secret-key`（`TSUKI_S3_SECRET_KEY`，本地复用共享 RustFS 对应密钥，生产可换用最小权限凭证）
+
+媒体暂存上传规则由 `tsuki-media` 中的 `tsuki.media.upload` 绑定（均带默认值，可按环境覆盖）：
+
+- `tsuki.media.upload.signature-ttl`：预签名 PUT 有效期，默认 `10m`，允许范围 `1m` 至 `15m`
+- `tsuki.media.upload.max-image-bytes`：允许上传的单张图片最大字节数，默认 `10485760`（10 MiB），须大于 `0`
+
+本地共享 RustFS 桶边界准备（每项目、每环境采用一个私有桶和一个交付桶，交付桶 `tsuki-dev-media-delivery` 留待发布能力落地时创建）：
+
+- 创建私有桶 `tsuki-dev-media-private`，本地复用共享 RustFS 管理员凭证通过桶名与对象前缀实现项目隔离；生产部署时可单独配置仅授权目标桶/前缀的访问凭证
+- 为 `tsuki-dev-media-private` 配置前缀 `incoming/image/` 的生命周期规则，默认 `7` 天自动过期，用于清理联调或放弃上传产生的残留对象
+- 为 `tsuki-dev-media-private` 配置桶级 CORS：允许来源 `http://localhost:5173`、方法 `PUT`、请求头 `content-type` 与 `if-none-match`、预检缓存 `600` 秒（前端开发端口变更时同步调整来源；若本地 RustFS 暂不支持桶级 CORS，浏览器联调需在具备 CORS 支持的环境继续）
 
 ### 生产环境配置（prod profile）
 
