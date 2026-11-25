@@ -28,7 +28,7 @@
 - `tsuki.auth.refresh-user-idle-ttl`（`TSUKI_AUTH_REFRESH_USER_IDLE_TTL`，默认 `7d`，至少 `1d`）
 - `tsuki.auth.refresh-user-abs-ttl`（`TSUKI_AUTH_REFRESH_USER_ABS_TTL`，默认 `30d`，至少 `1d`）
 
-Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接由 `tsuki-infra` 引入自动装配，当前 `tsuki-auth` 使用 Redis 执行登录限流脚本。
+Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接与固定窗口限流脚本单例 `fixedWindowRateLimitScript`（`lua/fixed_window_rate_limit.lua`）由 `tsuki-infra` 统一提供，当前 `tsuki-auth`（登录限流）与 `tsuki-media`（上传签发限流）均复用该脚本。
 
 RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-infra` 装配（强制路径风格访问），运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
 
@@ -43,6 +43,10 @@ RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-
 
 - `tsuki.media.upload.signature-ttl`：预签名 PUT 有效期，默认 `10m`，允许范围 `1m` 至 `15m`
 - `tsuki.media.upload.max-image-bytes`：允许上传的单张图片最大字节数，默认 `10485760`（10 MiB），须大于 `0`
+- `tsuki.media.upload.admin-sign-limit`：管理端账号每 60 秒允许的图片直传签发次数，默认 `60`，须大于 `0`
+- `tsuki.media.upload.user-sign-limit`：用户端账号每 60 秒允许的图片直传签发次数，默认 `10`，须大于 `0`
+
+现有预签名 PUT 已将声明的 `Content-Length` 与 `If-None-Match: *` 签入请求签名，客户端直传须直接以原始 `File` 或 `Blob` 作为请求体，由浏览器自动计算并发送 `Content-Length`，且同一对象键不可重复覆盖。
 
 本地共享 RustFS 桶边界准备（每项目、每环境采用一个私有桶和一个交付桶，交付桶 `tsuki-dev-media-delivery` 留待发布能力落地时创建）：
 

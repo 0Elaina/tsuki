@@ -1,4 +1,4 @@
-package com.nep.tsuki.media.storage;
+package com.nep.tsuki.media.model.enums;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

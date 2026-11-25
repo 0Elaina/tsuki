@@ -1,4 +1,4 @@
-package com.nep.tsuki.media.storage;
+package com.nep.tsuki.media.model.enums;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -22,7 +22,7 @@ public enum ImageContentType {
 
     private final String mimeType;
 
-    public final static Set<String> SUPPORTED_MIME_TYPES = Arrays
+    public static final Set<String> SUPPORTED_MIME_TYPES = Arrays
             .stream(values())
             .map(ImageContentType::getMimeType)
             .collect(Collectors.toUnmodifiableSet());

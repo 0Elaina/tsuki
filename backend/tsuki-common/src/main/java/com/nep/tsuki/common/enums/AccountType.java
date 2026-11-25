@@ -1,4 +1,4 @@
-package com.nep.tsuki.auth.model.enums;
+package com.nep.tsuki.common.enums;
 
 public enum AccountType {
     USER,

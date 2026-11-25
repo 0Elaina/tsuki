@@ -2,6 +2,10 @@ package com.nep.tsuki.media.storage;
 
 import java.util.Optional;
 
+import com.nep.tsuki.media.model.dto.PresignedImageUpload;
+import com.nep.tsuki.media.model.dto.StagedObjectMetadata;
+import com.nep.tsuki.media.model.dto.StagingObjectKey;
+
 /**
  * 暂存区上传存储接口（用于管理客户端直传的临时对象）
  */
@@ -20,8 +24,8 @@ public interface StagedUploadStorage {
     /**
      * 查询暂存对象的元数据
      *
-     * @param key 暂存对象键
+     * @param objectKey 数据库保存的完整暂存对象键
      * @return 若对象存在则返回其元数据，否则返回 {@link Optional#empty()}
      */
-    Optional<StagedObjectMetadata> find(StagingObjectKey key);
+    Optional<StagedObjectMetadata> find(String objectKey);
 }

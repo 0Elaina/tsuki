@@ -2,7 +2,7 @@ package com.nep.tsuki.user.utils;
 
 import java.util.List;
 
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.user.model.enums.AccountRole;
 
 public final class AccountTypeUtils {

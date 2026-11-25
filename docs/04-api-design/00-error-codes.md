@@ -46,3 +46,8 @@ HTTP 状态表示请求结果，`code` 是供调用方判断的稳定字符串�
 | 404 | `CATEGORY_NOT_FOUND` | 分类不存在 | `tsuki-taxonomy` |
 | 409 | `TAG_NAME_CONFLICT` | 标签名称已存在 | `tsuki-taxonomy` |
 | 404 | `TAG_NOT_FOUND` | 标签不存在 | `tsuki-taxonomy` |
+| 429 | `MEDIA_UPLOAD_RATE_LIMITED` | 上传签名请求过于频繁, 请稍候重试 | `tsuki-media` |
+| 503 | `MEDIA_UPLOAD_LIMIT_UNAVAILABLE` | 上传限流服务暂时不可用, 请稍后再试 | `tsuki-media` |
+| 410 | `MEDIA_UPLOAD_EXPIRED` | 上传会话已过期, 请重新申请上传凭证 | `tsuki-media` |
+| 409 | `MEDIA_UPLOAD_OBJECT_MISSING` | 暂存对象尚未上传完成 | `tsuki-media` |
+| 409 | `MEDIA_UPLOAD_METADATA_MISMATCH` | 已上传对象的类型或大小与声明不符 | `tsuki-media` |

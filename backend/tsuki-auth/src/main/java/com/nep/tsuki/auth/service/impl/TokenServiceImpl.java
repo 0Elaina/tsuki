@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import com.nep.tsuki.auth.config.JwtProperties;
 import com.nep.tsuki.auth.constants.JwtConstants;
 import com.nep.tsuki.auth.model.dto.IssuedTokens;
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.auth.model.enums.TokenType;
 import com.nep.tsuki.auth.service.TokenService;
 import com.nep.tsuki.common.utils.TimeUtils;

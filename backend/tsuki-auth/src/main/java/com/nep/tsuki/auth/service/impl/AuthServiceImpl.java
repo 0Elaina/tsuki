@@ -23,7 +23,7 @@ import com.nep.tsuki.auth.mapper.AuthSessionMapper;
 import com.nep.tsuki.auth.model.dto.AuthenticatedAccount;
 import com.nep.tsuki.auth.model.dto.IssuedTokens;
 import com.nep.tsuki.auth.model.entity.AuthSession;
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.auth.service.AccountAuthenticateService;
 import com.nep.tsuki.auth.service.AuthService;
 import com.nep.tsuki.auth.service.AuthSessionService;

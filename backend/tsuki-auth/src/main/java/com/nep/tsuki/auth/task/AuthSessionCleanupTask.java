@@ -24,7 +24,7 @@ public class AuthSessionCleanupTask {
     /**
      * 定时任务：每天凌晨3点清理超过7天的过期认证会话
      */
-    @Scheduled(cron = CLEANUP_CRON, zone = TimeConstants.SHANGHAI)
+    @Scheduled(cron = CLEANUP_CRON, zone = TimeConstants.ZONE_SHANGHAI)
     public void cleanupExpiredSession() {
         OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusDays(EXPIRED_DAYS);
         int deletedCount = authSessionMapper.deleteExpiredBefore(cutoff);

@@ -16,7 +16,7 @@ import com.nep.tsuki.auth.constants.AuthApiCode;
 import com.nep.tsuki.auth.constants.CookieConstants;
 import com.nep.tsuki.auth.model.dto.IssuedTokens;
 import com.nep.tsuki.auth.model.dto.LoginRequest;
-import com.nep.tsuki.auth.model.enums.AccountType;
+import com.nep.tsuki.common.enums.AccountType;
 import com.nep.tsuki.auth.model.vo.CsrfTokenResponse;
 import com.nep.tsuki.auth.model.vo.LoginResponse;
 import com.nep.tsuki.auth.service.AuthService;

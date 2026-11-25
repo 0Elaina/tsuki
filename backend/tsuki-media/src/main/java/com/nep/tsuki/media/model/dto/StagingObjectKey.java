@@ -1,4 +1,4 @@
-package com.nep.tsuki.media.storage;
+package com.nep.tsuki.media.model.dto;
 
 import java.time.LocalDate;
 import java.util.Objects;
@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.nep.tsuki.common.constants.TimeConstants;
 import com.nep.tsuki.media.constants.MediaStorageConstants;
+import com.nep.tsuki.media.model.enums.MediaKind;
 
 public record StagingObjectKey(
         MediaKind kind,
