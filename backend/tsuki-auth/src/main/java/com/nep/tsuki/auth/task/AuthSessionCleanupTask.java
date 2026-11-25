@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import com.nep.tsuki.auth.mapper.AuthSessionMapper;
-import com.nep.tsuki.common.constants.ZoneConstants;
+import com.nep.tsuki.common.constants.TimeConstants;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class AuthSessionCleanupTask {
     /**
      * 定时任务：每天凌晨3点清理超过7天的过期认证会话
      */
-    @Scheduled(cron = CLEANUP_CRON, zone = ZoneConstants.SHANGHAI)
+    @Scheduled(cron = CLEANUP_CRON, zone = TimeConstants.SHANGHAI)
     public void cleanupExpiredSession() {
         OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusDays(EXPIRED_DAYS);
         int deletedCount = authSessionMapper.deleteExpiredBefore(cutoff);
