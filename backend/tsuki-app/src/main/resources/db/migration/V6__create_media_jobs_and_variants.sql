@@ -7,7 +7,7 @@ CREATE TABLE media_jobs (
     available_at TIMESTAMPTZ NOT NULL,
     lease_until TIMESTAMPTZ,
     dispatch_after TIMESTAMPTZ,
-    dispatch_token UUID,
+    dispatch_token VARCHAR(36),
     dispatched_at TIMESTAMPTZ,
     failure_code VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
