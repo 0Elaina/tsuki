@@ -9,11 +9,10 @@
             status = 'PENDING'
             AND dispatch_after IS NOT NULL
             AND dispatch_after &lt;= #{now}
-            AND type IN (
+            AND type IN
         <foreach collection="supportedTypes" item="item" open="(" separator="," close=")">
             #{item}
         </foreach>
-        )
         ORDER BY dispatch_after, id
         LIMIT #{batchSize}
         FOR UPDATE SKIP LOCKED
