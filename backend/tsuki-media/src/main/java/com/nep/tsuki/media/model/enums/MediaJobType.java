@@ -1,6 +1,7 @@
 package com.nep.tsuki.media.model.enums;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -23,6 +24,10 @@ public enum MediaJobType {
 
     /** 对应的 RabbitMQ 路由键 */
     private final String routingKey;
+
+    public static final List<String> ALL_TYPE_NAMES = Arrays.stream(values())
+            .map(MediaJobType::name)
+            .toList();
 
     /** 枚举名称到枚举实例的只读缓存映射 */
     private static final Map<String, MediaJobType> BY_NAME = Arrays
