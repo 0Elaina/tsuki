@@ -12,6 +12,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -23,13 +24,17 @@ import com.nep.tsuki.media.config.MediaUploadProperties;
 import com.nep.tsuki.media.constants.MediaApiCode;
 import com.nep.tsuki.media.constants.MediaRedisConstants;
 import com.nep.tsuki.media.mapper.MediaAssetMapper;
+import com.nep.tsuki.media.mapper.MediaJobMapper;
 import com.nep.tsuki.media.model.dto.IssuedMediaUpload;
 import com.nep.tsuki.media.model.dto.PresignedImageUpload;
 import com.nep.tsuki.media.model.dto.StagedObjectMetadata;
 import com.nep.tsuki.media.model.dto.StagingObjectKey;
 import com.nep.tsuki.media.model.entity.MediaAsset;
+import com.nep.tsuki.media.model.entity.MediaJob;
 import com.nep.tsuki.media.model.enums.ImageContentType;
 import com.nep.tsuki.media.model.enums.MediaAssetStatus;
+import com.nep.tsuki.media.model.enums.MediaJobStatus;
+import com.nep.tsuki.media.model.enums.MediaJobType;
 import com.nep.tsuki.media.model.enums.MediaKind;
 import com.nep.tsuki.media.storage.StagedUploadStorage;
 import com.nep.tsuki.media.utils.MediaUtils;
@@ -48,6 +53,9 @@ public class MediaUploadService {
     private final MediaUploadProperties mediaUploadProperties;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisScript<Long> fixedWindowRateLimitScript;
+
+    private final MediaJobMapper mediaJobMapper;
+    private final TransactionTemplate transactionTemplate;
 
     /**
      * 签发图片直传预签名凭证并创建待上传媒体资产记录
@@ -158,17 +166,35 @@ public class MediaUploadService {
 
         // 基于乐观条件（未确认且未过期）原子更新资产状态与 ETag
         OffsetDateTime confirmedAt = OffsetDateTime.now(ZoneOffset.UTC);
-        int updatedRows = mediaAssetMapper.update(null, new LambdaUpdateWrapper<MediaAsset>()
-                .eq(MediaAsset::getId, assetId)
-                .eq(MediaAsset::getUploaderAccountId, uploaderAccountId)
-                .eq(MediaAsset::getStatus, MediaAssetStatus.PENDING_UPLOAD.name())
-                .isNull(MediaAsset::getConfirmedAt)
-                .gt(MediaAsset::getConfirmExpiresAt, confirmedAt)
-                .set(MediaAsset::getStatus, MediaAssetStatus.UPLOAD_CONFIRMED.name())
-                .set(MediaAsset::getConfirmedAt, confirmedAt)
-                .set(MediaAsset::getEtag, metadata.eTag())
-                .set(MediaAsset::getUpdatedAt, confirmedAt));
-        if (updatedRows == 1) {
+
+        Boolean confirmed = transactionTemplate.execute(status -> {
+            int updatedRows = mediaAssetMapper.update(null, new LambdaUpdateWrapper<MediaAsset>()
+                    .eq(MediaAsset::getId, assetId)
+                    .eq(MediaAsset::getUploaderAccountId, uploaderAccountId)
+                    .eq(MediaAsset::getStatus, MediaAssetStatus.PENDING_UPLOAD.name())
+                    .isNull(MediaAsset::getConfirmedAt)
+                    .gt(MediaAsset::getConfirmExpiresAt, confirmedAt)
+                    .set(MediaAsset::getStatus, MediaAssetStatus.UPLOAD_CONFIRMED.name())
+                    .set(MediaAsset::getConfirmedAt, confirmedAt)
+                    .set(MediaAsset::getEtag, metadata.eTag())
+                    .set(MediaAsset::getUpdatedAt, confirmedAt));
+            if (updatedRows != 1) {
+                return Boolean.FALSE;
+            }
+
+            MediaJob mediaJob = new MediaJob();
+            mediaJob.setAssetId(assetId);
+            mediaJob.setType(MediaJobType.PROCESS_IMAGE.name());
+            mediaJob.setStatus(MediaJobStatus.PENDING.name());
+            mediaJob.setAttemptCount(0);
+            mediaJob.setAvailableAt(confirmedAt);
+            mediaJob.setDispatchAfter(confirmedAt);
+            mediaJobMapper.insert(mediaJob);
+
+            return Boolean.TRUE;
+        });
+
+        if (Boolean.TRUE.equals(confirmed)) {
             log.info("确认图片上传成功: assetId={}, uploaderAccountId={}, byteSize={}", assetId, uploaderAccountId,
                     metadata.byteSize());
             return;
