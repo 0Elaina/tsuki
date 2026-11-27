@@ -4,8 +4,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -36,6 +38,11 @@ import net.coobird.thumbnailator.Thumbnails;
 public class ImageProcessor {
     private static final int MAX_DIMENSION_PX = 8192;
     private static final long MAX_PIXELS = 25_000_000L;
+    private static final List<String> FATAL_DECODE_WARNING_KEYWORDS = List.of(
+            "premature end",
+            "truncated",
+            "unexpected end",
+            "bad huffman");
 
     private record ImageHeader(int width, int height) {
     }
@@ -200,9 +207,24 @@ public class ImageProcessor {
                 }
 
                 if (verifyFullDecode) {
+                    AtomicBoolean fatalWarning = new AtomicBoolean(false);
+                    reader.addIIOReadWarningListener((source, warning) -> {
+                        if (isFatalDecodeWarning(warning)) {
+                            fatalWarning.set(true);
+                            log.warn("图像完整解码触发致命截断或损坏告警: expectedMimeType={}, warning={}",
+                                    expectedMimeType, warning);
+                        } else {
+                            log.debug("图像完整解码忽略非致命告警: expectedMimeType={}, warning={}",
+                                    expectedMimeType, warning);
+                        }
+                    });
                     BufferedImage decodedImage = reader.read(0);
-                    if (decodedImage == null || decodedImage.getWidth() <= 0 || decodedImage.getHeight() <= 0) {
-                        log.warn("图像完整解码结果无效: expectedMimeType={}", expectedMimeType);
+                    if (fatalWarning.get()
+                            || decodedImage == null
+                            || decodedImage.getWidth() <= 0
+                            || decodedImage.getHeight() <= 0) {
+                        log.warn("图像完整解码未通过校验: expectedMimeType={}, fatalWarning={}",
+                                expectedMimeType, fatalWarning.get());
                         return MediaProcessResult.failure(MediaJobCode.INVALID_IMAGE);
                     }
                 }
@@ -216,6 +238,22 @@ public class ImageProcessor {
             log.warn("读取或校验图像失败: expectedMimeType={}", expectedMimeType, ex);
             return MediaProcessResult.failure(MediaJobCode.INVALID_IMAGE);
         }
+    }
+
+    /**
+     * 判断 ImageIO 解码告警是否属于明确的图像截断或码流损坏（忽略常见的良性冗余字节等非致命告警）
+     */
+    private boolean isFatalDecodeWarning(String warning) {
+        if (!StringUtils.hasText(warning)) {
+            return false;
+        }
+        String normalized = warning.toLowerCase(Locale.ROOT);
+        for (String keyword : FATAL_DECODE_WARNING_KEYWORDS) {
+            if (normalized.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

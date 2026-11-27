@@ -140,6 +140,8 @@ public class MediaImageJobConsumer {
                     job.getId(),
                     job.getAttemptCount(),
                     originalContentType);
+            // 在 PUT 前即登记本次尝试独占的目标键：即便写入已落盘但响应超时丢失，失败分支也能幂等清理
+            uploadedKeys.add(originalKey);
             String archivedEtag;
             try {
                 archivedEtag = mediaObjectStorage.archiveObject(
@@ -149,7 +151,6 @@ public class MediaImageJobConsumer {
                         tempFile,
                         asset.getContentType(),
                         asset.getByteSize());
-                uploadedKeys.add(originalKey);
             } catch (IllegalStateException ex) {
                 log.warn("上传归档原件失败: jobId={}, assetId={}, attemptCount={}", job.getId(), asset.getId(),
                         job.getAttemptCount(), ex);
@@ -199,13 +200,13 @@ public class MediaImageJobConsumer {
 
     /**
      * 提交图片处理成功结果，在短事务中落库任务终态与归档后的资产状态
-     * 若租约已失效则放弃入库并清理本次上传对象，若数据库异常则先核对引用再决定清理并触发退避重投
+     * 若租约已失效则放弃入库并清理本次上传对象；若数据库提交结果不明确则保留原件（若实际回滚，由租期回收器兜底清理）并退避重投
      *
      * @param job          当前执行中的媒体任务
      * @param asset        关联的媒体资产
      * @param originalKey  归档后的原始对象存储键
      * @param archivedEtag 归档后的原始对象 ETag
-     * @param uploadedKeys 本次实际已上传至对象存储的全部对象键列表
+     * @param uploadedKeys 本次尝试已登记待清理的对象键列表
      */
     private void commitSuccess(
             MediaJob job,
@@ -230,12 +231,10 @@ public class MediaImageJobConsumer {
                 mediaObjectStorage.deleteQuietly(uploadedKeys);
             }
         } catch (DataAccessException | TransactionException ex) {
-            // 提交阶段发生数据库异常时结果不明确（可能已提交但响应超时），需先核对引用防止误删
-            log.error("提交图片处理成功结果时发生数据库异常，先核对引用再决定清理: jobId={}, assetId={}", job.getId(), asset.getId(), ex);
-            cleanupIfUnreferenced(
-                    asset.getId(),
-                    originalKey,
-                    uploadedKeys);
+            // 提交结果不明确时不得凭普通 SELECT 主动删对象（可能出现原事务滞后提交成功而对象已被删的竞态）；
+            // 此处保留原件并退避重投，若原事务实际回滚，由 MediaJobReaper 在租期到期后接管并清理本次尝试对象
+            log.error("提交图片处理成功结果时发生数据库异常，保留归档原件并退避 1 秒后重投: jobId={}, assetId={}, originalKey={}",
+                    job.getId(), asset.getId(), originalKey, ex);
             waitBeforeImmediateRequeue();
             throw new ImmediateRequeueAmqpException("提交图片处理成功结果时数据库访问异常: jobId=" + job.getId(), ex);
         }
@@ -281,39 +280,6 @@ public class MediaImageJobConsumer {
             log.error("保存图片处理失败状态时数据库访问异常，退避 1 秒后重投: jobId={}, failureCode={}", job.getId(), failureCode.code(), ex);
             waitBeforeImmediateRequeue();
             throw new ImmediateRequeueAmqpException("保存图片处理失败状态时数据库访问异常: jobId=" + job.getId(), ex);
-        }
-    }
-
-    /**
-     * 在数据库提交结果不明确时，先核对本次上传的对象是否已被数据库引用
-     * 仅在确认未被引用时静默清理对象存储文件，防止误删已落库的有效资产
-     *
-     * @param assetId      媒体资产主键 ID
-     * @param originalKey  归档后的原始对象存储键
-     * @param uploadedKeys 本次实际已上传至对象存储的全部对象键列表
-     */
-    private void cleanupIfUnreferenced(
-            long assetId,
-            String originalKey,
-            List<String> uploadedKeys) {
-        if (uploadedKeys.isEmpty()) {
-            return;
-        }
-
-        try {
-            // 核对资产表与规格表中是否已存在对本次上传对象的引用
-            boolean referenced = mediaJobTxService.isAnyObjectReferenced(
-                    assetId,
-                    originalKey,
-                    List.of());
-            if (!referenced) {
-                mediaObjectStorage.deleteQuietly(uploadedKeys);
-            } else {
-                log.warn("数据库已保留本次上传对象引用，跳过清理: assetId={}, originalKey={}", assetId, originalKey);
-            }
-        } catch (DataAccessException | TransactionException checkEx) {
-            // 核对本身也失败时采取保守策略，保留对象避免误删，留待后续巡检清理
-            log.warn("核对数据库对象引用状态失败，暂不删除已上传对象以防误删: assetId={}", assetId, checkEx);
         }
     }
 

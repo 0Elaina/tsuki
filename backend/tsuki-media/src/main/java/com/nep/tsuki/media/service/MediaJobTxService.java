@@ -3,7 +3,6 @@ package com.nep.tsuki.media.service;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.nep.tsuki.media.config.MediaJobsProperties;
 import com.nep.tsuki.media.constants.MediaJobConstants;
@@ -200,44 +198,5 @@ public class MediaJobTxService {
             return Boolean.TRUE;
         });
         return Boolean.TRUE.equals(updated);
-    }
-
-    /**
-     * 检查指定的原始对象键或任意衍生规格对象键是否已被数据库正式引用
-     * 常用于事务提交结果不明确时，核对已上传的对象存储文件是否可安全清理
-     *
-     * @param assetId     媒体资产主键 ID
-     * @param originalKey 待核对的原始归档对象键（可为空）
-     * @param variantKeys 待核对的衍生规格对象键集合（可为空）
-     * @return 只要任意一个对象键已在资产表或规格表中存在引用则返回 true，否则返回 false
-     */
-    public boolean isAnyObjectReferenced(
-            long assetId,
-            String originalKey,
-            Collection<String> variantKeys) {
-        // 若传入了有效的原始对象键，优先核对资产表当前是否已指向该键
-        if (StringUtils.hasText(originalKey)) {
-            MediaAsset currentAsset = mediaAssetMapper.selectById(assetId);
-            if (currentAsset != null && originalKey.equals(currentAsset.getObjectKey())) {
-                return true;
-            }
-        }
-
-        // 过滤空白与重复的规格对象键，无有效键时直接返回未引用
-        List<String> validVariantKeys = variantKeys == null
-                ? List.of()
-                : variantKeys.stream()
-                        .filter(StringUtils::hasText)
-                        .distinct()
-                        .toList();
-        if (validVariantKeys.isEmpty()) {
-            return false;
-        }
-
-        // 批量查询规格表中是否存在对上述对象键的引用记录
-        Long variantCount = mediaVariantMapper.selectCount(new LambdaQueryWrapper<MediaVariant>()
-                .eq(MediaVariant::getAssetId, assetId)
-                .in(MediaVariant::getObjectKey, validVariantKeys));
-        return variantCount != null && variantCount > 0L;
     }
 }

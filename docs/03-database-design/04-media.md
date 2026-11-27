@@ -180,7 +180,7 @@ COMMENT ON COLUMN media_jobs.updated_at IS '更新时间';
 | --- | --- | --- | --- |
 | pk_media_variants | 主键唯一 | id | 按规格主键定位单条规格记录 |
 | uk_media_variants_asset_id_code | 唯一 | asset_id, code | 保证同一媒体资产下每个规格编码唯一，同时以前导列 `asset_id` 支撑按资产查询规格及 `fk_media_variants_media_assets` 外键删除限制检查 |
-| uk_media_variants_object_key | 唯一 | object_key | 保证规格对象键唯一，支撑事务提交结果不明确时按 `(asset_id, object_key)` 核对对象引用 |
+| uk_media_variants_object_key | 唯一 | object_key | 保证规格对象键与规格记录一一对应，防止重复写入或误覆盖 |
 
 **关系**
 
