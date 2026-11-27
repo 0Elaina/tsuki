@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nep.tsuki.file.mapper.FileVariantMapper">
+    <!-- 批量插入文件交付规格记录 -->
+    <insert id="insertBatch">
+        INSERT INTO file_variants (
+            asset_id,
+            code,
+            object_key,
+            content_type,
+            byte_size,
+            width,
+            height,
+            metadata,
+            created_at,
+            updated_at
+        ) VALUES
+        <foreach collection="variants" item="variant" separator=",">
+            (
+                #{variant.assetId},
+                #{variant.code},
+                #{variant.objectKey},
+                #{variant.contentType},
+                #{variant.byteSize},
+                #{variant.width},
+                #{variant.height},
+                #{variant.metadata,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
+                #{now},
+                #{now}
+            )
+        </foreach>
+    </insert>
+</mapper>

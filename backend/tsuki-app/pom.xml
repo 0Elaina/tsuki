@@ -36,7 +36,7 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>tsuki-media</artifactId>
+            <artifactId>tsuki-file</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
