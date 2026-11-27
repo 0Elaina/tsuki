@@ -20,7 +20,7 @@
 		<module>tsuki-auth</module>
 		<module>tsuki-taxonomy</module>
 		<module>tsuki-infra</module>
-		<module>tsuki-media</module>
+		<module>tsuki-file</module>
 	</modules>
 	<name>tsuki-parent</name>
 
@@ -67,7 +67,7 @@
 			</dependency>
 			<dependency>
 				<groupId>com.nep.tsuki</groupId>
-				<artifactId>tsuki-media</artifactId>
+				<artifactId>tsuki-file</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 

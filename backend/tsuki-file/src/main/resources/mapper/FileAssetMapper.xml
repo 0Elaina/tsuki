@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nep.tsuki.file.mapper.FileAssetMapper">
+    <!-- 批量删除过期的未确认记录 -->
+    <delete id="deleteExpiredUnconfirmedBatch">
+        DELETE FROM file_assets
+        WHERE id IN (
+            SELECT id
+            FROM file_assets
+            WHERE confirmed_at IS NULL
+                AND confirm_expires_at &lt;= #{cutoff}
+            ORDER BY confirm_expires_at, id
+            LIMIT #{batchSize}
+            FOR UPDATE SKIP LOCKED
+        )
+        AND confirmed_at IS NULL
+    </delete>
+
+    <!-- 归档完成时原子推进资产状态为 READY 并写入正式对象键、ETag 与 JSONB 扩展元数据 -->
+    <update id="markReady">
+        UPDATE file_assets
+        SET object_key = #{objectKey},
+            etag = #{etag},
+            metadata = #{metadata,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
+            status = #{targetStatus},
+            updated_at = #{now}
+        WHERE id = #{assetId}
+            AND status = #{expectedStatus}
+    </update>
+</mapper>
