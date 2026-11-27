@@ -35,14 +35,23 @@ import net.coobird.thumbnailator.Thumbnails;
 public class ImageProcessor {
     private static final int MAX_DIMENSION_PX = 8192;
     private static final long MAX_PIXELS = 25_000_000L;
-    private static final int PREVIEW_MAX_EDGE_PX = 1024;
-    private static final float PREVIEW_JPEG_QUALITY = 0.85f;
 
     private record ImageHeader(int width, int height) {
     }
 
-    public MediaProcessResult<ImageProcessingResult> createPreview(Path sourceFile, String expectedMimeType) {
-        return process(sourceFile, expectedMimeType, PREVIEW_MAX_EDGE_PX, PREVIEW_JPEG_QUALITY);
+    /**
+     * 校验本地图像文件头格式、尺寸上限及完整像素可解码性（不做缩放与重编码）
+     *
+     * @param sourceFile       待校验的本地图像文件
+     * @param expectedMimeType 预期的 MIME 类型，用于与文件头实际格式比对
+     * @return 校验通过返回 {@link MediaJobCode#SUCCESS}，否则返回对应的业务错误码
+     */
+    public MediaJobCode validate(Path sourceFile, String expectedMimeType) {
+        Objects.requireNonNull(sourceFile, "sourceFile 不能为空");
+        if (!StringUtils.hasText(expectedMimeType)) {
+            throw new IllegalArgumentException("expectedMimeType 不能为空");
+        }
+        return inspectImage(sourceFile, expectedMimeType, true).code();
     }
 
     /**
@@ -73,7 +82,7 @@ public class ImageProcessor {
         }
 
         // 仅读取文件头校验格式与尺寸，避免在解码超大/非法图像时消耗内存
-        MediaProcessResult<ImageHeader> headerResult = readAndValidateHeader(sourceFile, expectedMimeType);
+        MediaProcessResult<ImageHeader> headerResult = inspectImage(sourceFile, expectedMimeType, false);
         if (!headerResult.isSuccess()) {
             return MediaProcessResult.failure(headerResult.code());
         }
@@ -120,13 +129,17 @@ public class ImageProcessor {
     }
 
     /**
-     * 仅读取图像文件头并校验格式与尺寸（不解码完整像素数据，用于防御超大图像导致的 OOM）
+     * 读取图像文件头并校验格式与尺寸，按需执行完整帧解码以拦截损坏图像
      *
      * @param sourceFile       待校验的本地图像文件
      * @param expectedMimeType 预期的 MIME 类型，用于与文件实际格式比对
+     * @param verifyFullDecode 是否进一步解码第 0 帧完整像素以确认文件未损坏
      * @return 校验通过返回图像宽高信息，失败返回对应的业务错误码
      */
-    private MediaProcessResult<ImageHeader> readAndValidateHeader(Path sourceFile, String expectedMimeType) {
+    private MediaProcessResult<ImageHeader> inspectImage(
+            Path sourceFile,
+            String expectedMimeType,
+            boolean verifyFullDecode) {
         try (ImageInputStream inputStream = ImageIO.createImageInputStream(sourceFile.toFile())) {
             if (inputStream == null) {
                 log.warn("无法打开图像输入流: expectedMimeType={}", expectedMimeType);
@@ -167,13 +180,21 @@ public class ImageProcessor {
                     return MediaProcessResult.failure(MediaJobCode.IMAGE_TOO_LARGE);
                 }
 
+                if (verifyFullDecode) {
+                    BufferedImage decodedImage = reader.read(0);
+                    if (decodedImage == null || decodedImage.getWidth() <= 0 || decodedImage.getHeight() <= 0) {
+                        log.warn("图像完整解码结果无效: expectedMimeType={}", expectedMimeType);
+                        return MediaProcessResult.failure(MediaJobCode.INVALID_IMAGE);
+                    }
+                }
+
                 return MediaProcessResult.success(new ImageHeader(width, height));
             } finally {
                 // 释放解码器底层资源
                 reader.dispose();
             }
         } catch (IOException | RuntimeException ex) {
-            log.warn("读取图像头失败: expectedMimeType={}", expectedMimeType, ex);
+            log.warn("读取或校验图像失败: expectedMimeType={}", expectedMimeType, ex);
             return MediaProcessResult.failure(MediaJobCode.INVALID_IMAGE);
         }
     }
