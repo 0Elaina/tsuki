@@ -20,12 +20,12 @@ import com.nep.tsuki.media.config.MediaJobsProperties;
 import com.nep.tsuki.media.constants.MediaJobConstants;
 import com.nep.tsuki.media.mapper.MediaAssetMapper;
 import com.nep.tsuki.media.mapper.MediaJobMapper;
-import com.nep.tsuki.media.model.dto.ExpiredMediaJob;
 import com.nep.tsuki.media.model.entity.MediaAsset;
+import com.nep.tsuki.media.model.entity.MediaJob;
 import com.nep.tsuki.media.model.enums.MediaAssetStatus;
-import com.nep.tsuki.media.model.enums.MediaJobFailureCode;
 import com.nep.tsuki.media.model.enums.MediaJobStatus;
 import com.nep.tsuki.media.model.enums.MediaJobType;
+import com.nep.tsuki.media.processing.MediaJobCode;
 import com.nep.tsuki.media.storage.MediaObjectStorage;
 import com.nep.tsuki.media.utils.MediaObjectPathUtils;
 
@@ -90,29 +90,30 @@ public class MediaJobReaper implements SchedulingConfigurer {
         ReapBatchOutcome outcome = transactionTemplate.execute(status -> {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             // 加行锁查询一批已超时且仍处于运行状态的任务
-            List<ExpiredMediaJob> expiredJobs = mediaJobMapper.selectExpiredRunningForUpdate(now,
+            List<MediaJob> expiredJobs = mediaJobMapper.selectExpiredRunningForUpdate(now,
                     MediaJobConstants.REAP_BATCH_SIZE);
             if (expiredJobs.isEmpty()) {
                 return new ReapBatchOutcome(List.of(), false);
             }
 
             // 建立任务 ID 到任务详情的映射，方便后续数据库批量更新后快速组装返回结果
-            Map<Long, ExpiredMediaJob> jobById = new LinkedHashMap<>(expiredJobs.size());
+            Map<Long, MediaJob> jobById = new LinkedHashMap<>(expiredJobs.size());
             // 按当前已尝试次数分组待重试的任务（同组共享相同的退避延迟策略）
             Map<Integer, List<Long>> retryJobIdsByAttempt = new LinkedHashMap<>();
             // 收集重试次数已耗尽、需直接标记为最终失败的任务 ID
             List<Long> terminalJobIds = new ArrayList<>();
 
             // 遍历超时任务：建立索引并根据剩余重试额度分流
-            for (ExpiredMediaJob job : expiredJobs) {
-                jobById.put(job.id(), job);
+            for (MediaJob job : expiredJobs) {
+                jobById.put(job.getId(), job);
                 // 判断当前尝试次数是否还有对应的重试延迟配置（即未达到最大重试上限）
-                if (MediaJobConstants.retryDelayAfterAttempt(job.attemptCount()).isPresent()) {
+                if (MediaJobConstants.retryDelayAfterAttempt(job.getAttemptCount()).isPresent()) {
                     // 按重试次数分组收集任务ID，便于后续按相同退避时间批量处理
-                    retryJobIdsByAttempt.computeIfAbsent(job.attemptCount(), key -> new ArrayList<>()).add(job.id());
+                    retryJobIdsByAttempt.computeIfAbsent(job.getAttemptCount(), key -> new ArrayList<>())
+                            .add(job.getId());
                 } else {
                     // 重试次数已耗尽，归入终态失败集合
-                    terminalJobIds.add(job.id());
+                    terminalJobIds.add(job.getId());
                 }
             }
 
@@ -130,17 +131,17 @@ public class MediaJobReaper implements SchedulingConfigurer {
                         entry.getValue(),
                         attemptCount,
                         nextAvailableAt,
-                        MediaJobFailureCode.LEASE_EXPIRED.name(),
+                        MediaJobCode.LEASE_EXPIRED.code(),
                         now);
 
                 // 记录实际重排成功的任务（requeued = true）
                 for (Long updateId : updateIds) {
-                    ExpiredMediaJob job = jobById.get(updateId);
+                    MediaJob job = jobById.get(updateId);
                     reclaimedJobs.add(new ReclaimedJob(
-                            job.id(),
-                            job.assetId(),
-                            job.type(),
-                            job.attemptCount(),
+                            job.getId(),
+                            job.getAssetId(),
+                            job.getType(),
+                            job.getAttemptCount(),
                             true));
                 }
             }
@@ -150,22 +151,22 @@ public class MediaJobReaper implements SchedulingConfigurer {
                 // 批量将任务置为终态失败，并返回实际更新成功的任务 ID
                 List<Long> failureIds = mediaJobMapper.markExpiredBatchFailed(
                         terminalJobIds,
-                        MediaJobFailureCode.LEASE_EXPIRED.name(),
+                        MediaJobCode.LEASE_EXPIRED.code(),
                         now);
 
                 Set<Long> failedAssetIds = new LinkedHashSet<>(failureIds.size());
                 for (Long failureId : failureIds) {
-                    ExpiredMediaJob job = jobById.get(failureId);
+                    MediaJob job = jobById.get(failureId);
                     // 记录终态失败的任务（requeued = false）
                     reclaimedJobs.add(new ReclaimedJob(
-                            job.id(),
-                            job.assetId(),
-                            job.type(),
-                            job.attemptCount(),
+                            job.getId(),
+                            job.getAssetId(),
+                            job.getType(),
+                            job.getAttemptCount(),
                             false));
                     // 仅当该任务类型负责推进资产主状态时，才收集资产 ID 用于同步失败状态
-                    if (MediaJobType.findByName(job.type()).map(MediaJobType::isAdvancesAssetStatus).orElse(false)) {
-                        failedAssetIds.add(job.assetId());
+                    if (MediaJobType.findByName(job.getType()).map(MediaJobType::isAdvancesAssetStatus).orElse(false)) {
+                        failedAssetIds.add(job.getAssetId());
                     }
                 }
                 // 乐观校验资产仍处于 UPLOAD_CONFIRMED 状态后，批量流转为 PROCESSING_FAILED

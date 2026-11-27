@@ -7,8 +7,6 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.nep.tsuki.media.model.dto.DispatchedMediaJob;
-import com.nep.tsuki.media.model.dto.ExpiredMediaJob;
 import com.nep.tsuki.media.model.entity.MediaJob;
 
 @Mapper
@@ -24,7 +22,7 @@ public interface MediaJobMapper extends BaseMapper<MediaJob> {
      * @param batchSize      单次最大抢占数量
      * @return 成功抢占并锁定后的任务列表
      */
-    List<DispatchedMediaJob> claimDispatchBatch(
+    List<MediaJob> claimDispatchBatch(
             @Param("supportedTypes") List<String> supportedTypes,
             @Param("now") OffsetDateTime now,
             @Param("claimUntil") OffsetDateTime claimUntil,
@@ -51,7 +49,7 @@ public interface MediaJobMapper extends BaseMapper<MediaJob> {
      * @param batchSize 单次批量查询并锁定的最大任务数量
      * @return 已过期且处于运行中状态的媒体任务列表
      */
-    List<ExpiredMediaJob> selectExpiredRunningForUpdate(
+    List<MediaJob> selectExpiredRunningForUpdate(
             @Param("now") OffsetDateTime now,
             @Param("batchSize") int batchSize);
 

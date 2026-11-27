@@ -11,7 +11,7 @@ import java.util.Objects;
 import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.infra.storage.s3.S3Properties;
-import com.nep.tsuki.media.model.enums.MediaDownloadStatus;
+import com.nep.tsuki.media.processing.MediaJobCode;
 import com.nep.tsuki.media.storage.MediaObjectStorage;
 
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +54,7 @@ public class S3MediaObjectStorage implements MediaObjectStorage {
      * @return 下载结果状态
      */
     @Override
-    public MediaDownloadStatus downloadToFile(String objectKey, String expectedEtag, long expectedByteSize,
+    public MediaJobCode downloadToFile(String objectKey, String expectedEtag, long expectedByteSize,
             Path targetFile) {
         // 基础参数校验
         if (!StringUtils.hasText(objectKey)) {
@@ -83,7 +83,7 @@ public class S3MediaObjectStorage implements MediaObjectStorage {
             if (responseLength != null && responseLength.longValue() != expectedByteSize) {
                 log.warn("源对象响应长度与记录不符: objectKey={}, expected={}, actual={}",
                         objectKey, expectedByteSize, responseLength);
-                return MediaDownloadStatus.SOURCE_CHANGED;
+                return MediaJobCode.SOURCE_CHANGED;
             }
 
             // 流式读取与实时熔断：防止恶意构造或分块传输导致的实际字节数超出预期（防磁盘打满）
@@ -94,7 +94,7 @@ public class S3MediaObjectStorage implements MediaObjectStorage {
                 totalBytesRead += bytesRead;
                 if (totalBytesRead > expectedByteSize) {
                     log.warn("源对象实际读取字节超过预期: objectKey={}, expected={}", objectKey, expectedByteSize);
-                    return MediaDownloadStatus.SOURCE_CHANGED;
+                    return MediaJobCode.SOURCE_CHANGED;
                 }
                 outputStream.write(buffer, 0, bytesRead);
             }
@@ -103,18 +103,18 @@ public class S3MediaObjectStorage implements MediaObjectStorage {
             if (totalBytesRead != expectedByteSize) {
                 log.warn("源对象实际读取字节不足预期: objectKey={}, expected={}, actual={}",
                         objectKey, expectedByteSize, totalBytesRead);
-                return MediaDownloadStatus.SOURCE_CHANGED;
+                return MediaJobCode.SOURCE_CHANGED;
             }
 
-            return MediaDownloadStatus.SUCCESS;
+            return MediaJobCode.SUCCESS;
         } catch (NoSuchKeyException ex) {
             // 明确捕获 Key 不存在异常
-            return MediaDownloadStatus.SOURCE_MISSING;
+            return MediaJobCode.SOURCE_MISSING;
         } catch (S3Exception ex) {
             // 兼容部分 S3 兼容存储直接返回 HTTP 状态码的情况
             return switch (ex.statusCode()) {
-                case 404 -> MediaDownloadStatus.SOURCE_MISSING;
-                case 412 -> MediaDownloadStatus.SOURCE_CHANGED;
+                case 404 -> MediaJobCode.SOURCE_MISSING;
+                case 412 -> MediaJobCode.SOURCE_CHANGED;
                 default -> throw new IllegalStateException(
                         "读取媒体对象失败 (HTTP " + ex.statusCode() + "): objectKey=" + objectKey, ex);
             };

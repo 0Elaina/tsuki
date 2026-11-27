@@ -23,7 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.nep.tsuki.media.constants.MediaJobConstants;
 import com.nep.tsuki.media.constants.MediaRabbitConstants;
 import com.nep.tsuki.media.mapper.MediaJobMapper;
-import com.nep.tsuki.media.model.dto.DispatchedMediaJob;
+import com.nep.tsuki.media.model.entity.MediaJob;
 import com.nep.tsuki.media.model.enums.MediaJobType;
 
 import lombok.RequiredArgsConstructor;
@@ -75,7 +75,7 @@ public class MediaJobDispatcher {
         OffsetDateTime claimUntil = now.plusSeconds(MediaJobConstants.DISPATCH_CLAIM_DELAY_SECONDS);
 
         // 短事务认领一批待派发任务（更新下次调度时间与 batchToken），事务结束立即释放数据库连接
-        List<DispatchedMediaJob> claimedJobs = transactionTemplate.execute(status -> mediaJobMapper.claimDispatchBatch(
+        List<MediaJob> claimedJobs = transactionTemplate.execute(status -> mediaJobMapper.claimDispatchBatch(
                 SUPPORTED_TYPES,
                 now,
                 claimUntil,
@@ -91,12 +91,12 @@ public class MediaJobDispatcher {
         try {
             // 使用 invoke 绑定独占同一个 AMQP Channel 连续发送，减少连接池借还开销并提升吞吐量
             rabbitTemplate.invoke(operations -> {
-                for (DispatchedMediaJob job : claimedJobs) {
+                for (MediaJob job : claimedJobs) {
                     // 解析任务类型以获取对应的 RoutingKey
                     MediaJobType jobType = MediaJobType
-                            .findByName(job.type())
-                            .orElseThrow(() -> new IllegalStateException("未知媒体任务类型: " + job.type()));
-                    String jobIdText = String.valueOf(job.id());
+                            .findByName(job.getType())
+                            .orElseThrow(() -> new IllegalStateException("未知媒体任务类型: " + job.getType()));
+                    String jobIdText = String.valueOf(job.getId());
                     // 构造发布确认关联凭证，内部包含接收 Broker 异步回执的 CompletableFuture
                     CorrelationData correlationData = new CorrelationData(batchToken + ":" + jobIdText);
 
@@ -113,7 +113,7 @@ public class MediaJobDispatcher {
                             }, correlationData);
 
                     // 仅在本地成功写入发送缓冲区后才加入待确认列表
-                    pendingConfirms.add(new PendingConfirm(job.id(), correlationData));
+                    pendingConfirms.add(new PendingConfirm(job.getId(), correlationData));
                 }
                 return null;
             });

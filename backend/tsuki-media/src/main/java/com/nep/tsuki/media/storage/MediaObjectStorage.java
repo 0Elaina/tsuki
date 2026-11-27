@@ -3,7 +3,7 @@ package com.nep.tsuki.media.storage;
 import java.nio.file.Path;
 import java.util.Collection;
 
-import com.nep.tsuki.media.model.enums.MediaDownloadStatus;
+import com.nep.tsuki.media.processing.MediaJobCode;
 
 public interface MediaObjectStorage {
     /**
@@ -13,9 +13,9 @@ public interface MediaObjectStorage {
      * @param expectedEtag     期望的对象 ETag
      * @param expectedByteSize 期望的文件字节大小
      * @param targetFile       本地目标文件路径
-     * @return 下载结果状态
+     * @return 下载结果状态码
      */
-    MediaDownloadStatus downloadToFile(String objectKey, String expectedEtag, long expectedByteSize, Path targetFile);
+    MediaJobCode downloadToFile(String objectKey, String expectedEtag, long expectedByteSize, Path targetFile);
 
     /**
      * 将本地已校验的源文件归档上传到目标路径
