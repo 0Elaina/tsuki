@@ -45,12 +45,21 @@ public class FileJob {
     /** 实际派发到消息队列的时间 */
     private OffsetDateTime dispatchedAt;
 
+    /** 活跃任务防重键（同一活跃防重键仅允许存在 1 条 PENDING/RUNNING 任务） */
+    private String dedupKey;
+
     /** 任务扩展参数（按任务类型承载参数化配置） */
     @TableField(jdbcType = JdbcType.OTHER, typeHandler = PostgresJsonbTypeHandler.class)
     private Map<String, Object> payload;
 
     /** 任务执行失败时的错误码 */
     private String failureCode;
+
+    /** 任务执行失败时的补充详情（截断保存，便于排障） */
+    private String failureMessage;
+
+    /** 任务进入终态（SUCCEEDED / FAILED）的完成时间 */
+    private OffsetDateTime finishedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

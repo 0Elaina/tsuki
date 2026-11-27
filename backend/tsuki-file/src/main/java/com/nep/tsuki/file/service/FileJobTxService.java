@@ -22,6 +22,7 @@ import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.entity.FileVariant;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
 import com.nep.tsuki.file.model.enums.FileJobType;
+import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
 
 import lombok.RequiredArgsConstructor;
@@ -103,6 +104,9 @@ public class FileJobTxService {
                     if (variant.getAssetId() == null) {
                         variant.setAssetId(asset.getId());
                     }
+                    if (!StringUtils.hasText(variant.getStorageScope())) {
+                        variant.setStorageScope(FileStorageScope.PRIVATE.name());
+                    }
                 }
                 // 不能直接调用 MyBatis-Plus 的 insert(Collection)：同事务前序更新已绑定 SIMPLE 执行器
                 // MP 批量方法会切 BATCH 触发 ExecutorType 冲突
@@ -136,19 +140,28 @@ public class FileJobTxService {
         return Boolean.TRUE.equals(committed);
     }
 
+    private static final int MAX_FAILURE_MESSAGE_LENGTH = 1000;
+
     /**
      * 在短事务中记录文件任务执行失败，按需重排等待重试或标记为终态失败
      * 若任务进入终态失败且属于主任务，同步将关联的文件资产推进为 PROCESSING_FAILED
      *
-     * @param job         当前执行中的文件任务
-     * @param asset       关联的文件资产
-     * @param failureCode 本次失败对应的业务错误码
-     * @param requeue     是否重新入队等待重试；false 表示直接标记为终态失败
+     * @param job            当前执行中的文件任务
+     * @param asset          关联的文件资产
+     * @param failureCode    本次失败对应的业务错误码
+     * @param failureMessage 本次失败的补充详情（可为 null，超长自动截断）
+     * @param requeue        是否重新入队等待重试；false 表示直接标记为终态失败
      * @return 事务成功更新任务状态返回 true；若任务租约已失效或状态不匹配则返回 false
      */
-    public boolean recordFailure(FileJob job, FileAsset asset, FileJobCode failureCode, boolean requeue) {
+    public boolean recordFailure(
+            FileJob job,
+            FileAsset asset,
+            FileJobCode failureCode,
+            String failureMessage,
+            boolean requeue) {
         Objects.requireNonNull(job, "job 不能为空");
         Objects.requireNonNull(failureCode, "failureCode 不能为空");
+        String normalizedFailureMessage = normalizeFailureMessage(failureMessage);
 
         Boolean updated = transactionTemplate.execute(status -> {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -165,6 +178,7 @@ public class FileJobTxService {
                         job.getAttemptCount(),
                         nextAvailableAt,
                         failureCode.code(),
+                        normalizedFailureMessage,
                         now);
                 return updatedRows == 1;
             }
@@ -173,6 +187,7 @@ public class FileJobTxService {
                     job.getId(),
                     job.getAttemptCount(),
                     failureCode.code(),
+                    normalizedFailureMessage,
                     now);
             if (updatedRows != 1) {
                 return Boolean.FALSE;
@@ -192,5 +207,16 @@ public class FileJobTxService {
             return Boolean.TRUE;
         });
         return Boolean.TRUE.equals(updated);
+    }
+
+    private String normalizeFailureMessage(String failureMessage) {
+        if (!StringUtils.hasText(failureMessage)) {
+            return null;
+        }
+        String stripped = failureMessage.strip();
+        if (stripped.length() <= MAX_FAILURE_MESSAGE_LENGTH) {
+            return stripped;
+        }
+        return stripped.substring(0, MAX_FAILURE_MESSAGE_LENGTH);
     }
 }

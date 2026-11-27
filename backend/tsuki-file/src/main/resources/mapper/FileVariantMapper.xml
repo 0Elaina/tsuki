@@ -6,6 +6,7 @@
         INSERT INTO file_variants (
             asset_id,
             code,
+            storage_scope,
             object_key,
             content_type,
             byte_size,
@@ -19,6 +20,7 @@
             (
                 #{variant.assetId},
                 #{variant.code},
+                #{variant.storageScope},
                 #{variant.objectKey},
                 #{variant.contentType},
                 #{variant.byteSize},

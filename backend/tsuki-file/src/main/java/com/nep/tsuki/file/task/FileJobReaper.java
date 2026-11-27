@@ -106,6 +106,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                         attemptCount,
                         nextAvailableAt,
                         FileJobCode.LEASE_EXPIRED.code(),
+                        "任务执行租期已超时，已重排等待重试",
                         now);
 
                 for (Long updateId : updateIds) {
@@ -123,6 +124,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                 List<Long> failureIds = fileJobMapper.markExpiredBatchFailed(
                         terminalJobIds,
                         FileJobCode.LEASE_EXPIRED.code(),
+                        "任务执行租期已超时，达到最大尝试次数",
                         now);
 
                 Set<Long> failedAssetIds = new LinkedHashSet<>(failureIds.size());

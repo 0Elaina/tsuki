@@ -80,6 +80,7 @@ public class FileImageJobConsumer {
                     job,
                     null,
                     FileJobCode.SOURCE_MISSING,
+                    "关联的文件资产不存在: assetId=" + job.getAssetId(),
                     List.of());
             return;
         }
@@ -89,6 +90,7 @@ public class FileImageJobConsumer {
                     job,
                     asset,
                     FileJobCode.SOURCE_CHANGED,
+                    "文件资产当前状态不允许执行处理: status=" + asset.getStatus(),
                     List.of());
             return;
         }
@@ -110,13 +112,13 @@ public class FileImageJobConsumer {
             } catch (IllegalStateException ex) {
                 log.warn("下载图片原件失败: jobId={}, assetId={}, objectKey={}", job.getId(), asset.getId(),
                         asset.getObjectKey(), ex);
-                handleFailure(job, asset, FileJobCode.STORAGE_ERROR, uploadedKeys);
+                handleFailure(job, asset, FileJobCode.STORAGE_ERROR, "下载暂存原件失败: " + ex.getMessage(), uploadedKeys);
                 return;
             }
 
             if (!downloadCode.isSuccess()) {
                 log.warn("图片原件校验未通过: jobId={}, assetId={}, code={}", job.getId(), asset.getId(), downloadCode.code());
-                handleFailure(job, asset, downloadCode, uploadedKeys);
+                handleFailure(job, asset, downloadCode, "暂存原件下载校验未通过: " + downloadCode.code(), uploadedKeys);
                 return;
             }
 
@@ -127,7 +129,7 @@ public class FileImageJobConsumer {
             if (!probeResult.isSuccess()) {
                 log.warn("图片文件校验未通过: jobId={}, assetId={}, code={}", job.getId(), asset.getId(),
                         probeResult.code().code());
-                handleFailure(job, asset, probeResult.code(), uploadedKeys);
+                handleFailure(job, asset, probeResult.code(), "图片二进制校验未通过: " + probeResult.code().code(), uploadedKeys);
                 return;
             }
 
@@ -136,7 +138,8 @@ public class FileImageJobConsumer {
             if (originalContentType == null) {
                 log.warn("资产声明的图片 MIME 类型不受支持: jobId={}, assetId={}, contentType={}", job.getId(), asset.getId(),
                         asset.getContentType());
-                handleFailure(job, asset, FileJobCode.INVALID_IMAGE, uploadedKeys);
+                handleFailure(job, asset, FileJobCode.INVALID_IMAGE,
+                        "不支持的图片 MIME 类型: " + asset.getContentType(), uploadedKeys);
                 return;
             }
 
@@ -159,7 +162,7 @@ public class FileImageJobConsumer {
             } catch (IllegalStateException ex) {
                 log.warn("上传归档原件失败: jobId={}, assetId={}, attemptCount={}", job.getId(), asset.getId(),
                         job.getAttemptCount(), ex);
-                handleFailure(job, asset, FileJobCode.STORAGE_ERROR, uploadedKeys);
+                handleFailure(job, asset, FileJobCode.STORAGE_ERROR, "上传归档原件失败: " + ex.getMessage(), uploadedKeys);
                 return;
             }
 
@@ -172,7 +175,7 @@ public class FileImageJobConsumer {
                     uploadedKeys);
         } catch (IOException ex) {
             log.warn("创建图片处理临时文件失败: jobId={}, assetId={}", job.getId(), asset.getId(), ex);
-            handleFailure(job, asset, FileJobCode.STORAGE_ERROR, uploadedKeys);
+            handleFailure(job, asset, FileJobCode.STORAGE_ERROR, "创建本地临时文件失败: " + ex.getMessage(), uploadedKeys);
         } finally {
             deleteTempFileQuietly(tempFile);
         }
@@ -235,6 +238,7 @@ public class FileImageJobConsumer {
             FileJob job,
             FileAsset asset,
             FileJobCode failureCode,
+            String failureMessage,
             List<String> uploadedKeys) {
         boolean requeue = failureCode.retryable()
                 && FileJobConstants.retryDelayAfterAttempt(job.getAttemptCount()).isPresent();
@@ -244,6 +248,7 @@ public class FileImageJobConsumer {
                     job,
                     asset,
                     failureCode,
+                    failureMessage,
                     requeue);
             if (transitioned) {
                 log.warn("图片处理任务执行未成功: jobId={}, assetId={}, attemptCount={}, failureCode={}, requeue={}", job.getId(),

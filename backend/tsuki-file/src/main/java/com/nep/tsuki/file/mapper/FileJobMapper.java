@@ -13,6 +13,13 @@ import com.nep.tsuki.file.model.entity.FileJob;
 public interface FileJobMapper extends BaseMapper<FileJob> {
 
     /**
+     * 幂等插入任务：若存在相同活跃防重键（dedup_key 非空且处于 PENDING/RUNNING），则跳过插入并返回 0
+     */
+    int insertIfNotActive(
+            @Param("job") FileJob job,
+            @Param("now") OffsetDateTime now);
+
+    /**
      * 原子抢占一批待派发的文件处理任务
      */
     List<FileJob> claimDispatchBatch(
@@ -45,6 +52,7 @@ public interface FileJobMapper extends BaseMapper<FileJob> {
             @Param("expectedAttemptCount") int expectedAttemptCount,
             @Param("nextAvailableAt") OffsetDateTime nextAvailableAt,
             @Param("failureCode") String failureCode,
+            @Param("failureMessage") String failureMessage,
             @Param("now") OffsetDateTime now);
 
     /**
@@ -53,6 +61,7 @@ public interface FileJobMapper extends BaseMapper<FileJob> {
     List<Long> markExpiredBatchFailed(
             @Param("jobIds") List<Long> jobIds,
             @Param("failureCode") String failureCode,
+            @Param("failureMessage") String failureMessage,
             @Param("now") OffsetDateTime now);
 
     /**
@@ -80,6 +89,7 @@ public interface FileJobMapper extends BaseMapper<FileJob> {
             @Param("expectedAttemptCount") int expectedAttemptCount,
             @Param("nextAvailableAt") OffsetDateTime nextAvailableAt,
             @Param("failureCode") String failureCode,
+            @Param("failureMessage") String failureMessage,
             @Param("now") OffsetDateTime now);
 
     /**
@@ -89,5 +99,6 @@ public interface FileJobMapper extends BaseMapper<FileJob> {
             @Param("jobId") long jobId,
             @Param("expectedAttemptCount") int expectedAttemptCount,
             @Param("failureCode") String failureCode,
+            @Param("failureMessage") String failureMessage,
             @Param("now") OffsetDateTime now);
 }

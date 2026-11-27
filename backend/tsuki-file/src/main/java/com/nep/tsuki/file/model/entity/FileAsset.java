@@ -26,6 +26,7 @@ public class FileAsset {
     private Long uploaderAccountId;
     private String kind;
     private String status;
+    private String storageScope;
     private String objectKey;
     private String contentType;
     private Long byteSize;

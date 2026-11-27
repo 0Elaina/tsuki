@@ -29,6 +29,9 @@ public class FileVariant {
     /** 规格编码 */
     private String code;
 
+    /** 对象存储逻辑桶范围（PRIVATE / DELIVERY） */
+    private String storageScope;
+
     /** 对象存储（OSS/S3）中的文件存储路径键 */
     private String objectKey;
 

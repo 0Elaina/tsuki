@@ -12,11 +12,43 @@
         <result column="dispatch_after" property="dispatchAfter"/>
         <result column="dispatch_token" property="dispatchToken"/>
         <result column="dispatched_at" property="dispatchedAt"/>
+        <result column="dedup_key" property="dedupKey"/>
         <result column="payload" property="payload" typeHandler="com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler"/>
         <result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/>
+        <result column="finished_at" property="finishedAt"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
+
+    <!-- 幂等插入任务：若存在相同活跃防重键（dedup_key 非空且处于 PENDING/RUNNING），则跳过插入 -->
+    <insert id="insertIfNotActive">
+        INSERT INTO file_jobs (
+            asset_id,
+            type,
+            status,
+            attempt_count,
+            available_at,
+            dispatch_after,
+            dedup_key,
+            payload,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{job.assetId},
+            #{job.type},
+            #{job.status},
+            COALESCE(#{job.attemptCount}, 0),
+            #{job.availableAt},
+            #{job.dispatchAfter},
+            #{job.dedupKey},
+            #{job.payload,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
+            #{now},
+            #{now}
+        )
+        ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL AND status IN ('PENDING', 'RUNNING')
+        DO NOTHING
+    </insert>
 
     <!-- 原子抢占一批待派发的文件处理任务 -->
     <select id="claimDispatchBatch" affectData="true" flushCache="true" useCache="false" resultType="com.nep.tsuki.file.model.entity.FileJob">
@@ -79,6 +111,7 @@
             dispatch_token = NULL,
             dispatched_at = NULL,
             failure_code = #{failureCode},
+            failure_message = #{failureMessage},
             updated_at = #{now}
         WHERE status = 'RUNNING'
             AND attempt_count = #{expectedAttemptCount}
@@ -99,6 +132,8 @@
             dispatch_after = NULL,
             dispatch_token = NULL,
             failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            finished_at = #{now},
             updated_at = #{now}
         WHERE status = 'RUNNING'
             AND lease_until IS NOT NULL
@@ -124,7 +159,7 @@
             AND type = #{expectedType}
             AND status = 'PENDING'
             AND available_at &lt;= #{now}
-        RETURNING id, asset_id, type, status, attempt_count, available_at, lease_until, dispatch_after, dispatch_token, dispatched_at, payload, failure_code, created_at, updated_at
+        RETURNING id, asset_id, type, status, attempt_count, available_at, lease_until, dispatch_after, dispatch_token, dispatched_at, dedup_key, payload, failure_code, failure_message, finished_at, created_at, updated_at
     </select>
 
     <!-- 将运行中的任务标记为执行成功 -->
@@ -135,6 +170,8 @@
             dispatch_after = NULL,
             dispatch_token = NULL,
             failure_code = NULL,
+            failure_message = NULL,
+            finished_at = #{now},
             updated_at = #{now}
         WHERE id = #{jobId}
             AND status = 'RUNNING'
@@ -152,6 +189,7 @@
             dispatch_token = NULL,
             dispatched_at = NULL,
             failure_code = #{failureCode},
+            failure_message = #{failureMessage},
             updated_at = #{now}
         WHERE id = #{jobId}
             AND status = 'RUNNING'
@@ -167,6 +205,8 @@
             dispatch_after = NULL,
             dispatch_token = NULL,
             failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            finished_at = #{now},
             updated_at = #{now}
         WHERE id = #{jobId}
             AND status = 'RUNNING'

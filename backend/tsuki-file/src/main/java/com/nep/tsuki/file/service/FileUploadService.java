@@ -35,6 +35,7 @@ import com.nep.tsuki.file.model.enums.FileAssetStatus;
 import com.nep.tsuki.file.model.enums.FileJobStatus;
 import com.nep.tsuki.file.model.enums.FileJobType;
 import com.nep.tsuki.file.model.enums.FileKind;
+import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.model.enums.ImageContentType;
 import com.nep.tsuki.file.storage.StagedUploadStorage;
 import com.nep.tsuki.file.utils.FileUtils;
@@ -130,6 +131,7 @@ public class FileUploadService {
         fileAsset.setUploaderAccountId(uploaderAccountId);
         fileAsset.setKind(FileKind.IMAGE.name());
         fileAsset.setStatus(FileAssetStatus.PENDING_UPLOAD.name());
+        fileAsset.setStorageScope(FileStorageScope.PRIVATE.name());
         fileAsset.setObjectKey(stagingObjectKey.value());
         fileAsset.setContentType(normalizedContentType);
         fileAsset.setByteSize(byteSize);
@@ -211,7 +213,8 @@ public class FileUploadService {
             fileJob.setAttemptCount(0);
             fileJob.setAvailableAt(confirmedAt);
             fileJob.setDispatchAfter(confirmedAt);
-            fileJobMapper.insert(fileJob);
+            fileJob.setDedupKey(assetId + ":" + FileJobType.PROCESS_IMAGE.name());
+            fileJobMapper.insertIfNotActive(fileJob, confirmedAt);
 
             return Boolean.TRUE;
         });

@@ -3,8 +3,9 @@ CREATE TABLE file_assets (
     uploader_account_id BIGINT NOT NULL,
     kind VARCHAR(16) NOT NULL,
     status VARCHAR(32) NOT NULL,
+    storage_scope VARCHAR(16) NOT NULL,
     object_key VARCHAR(1024) NOT NULL,
-    content_type VARCHAR(64) NOT NULL,
+    content_type VARCHAR(128) NOT NULL,
     byte_size BIGINT NOT NULL,
     etag VARCHAR(256),
     original_filename VARCHAR(255),
@@ -14,7 +15,7 @@ CREATE TABLE file_assets (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_file_assets PRIMARY KEY (id),
-    CONSTRAINT uk_file_assets_object_key UNIQUE (object_key),
+    CONSTRAINT uk_file_assets_storage_scope_object_key UNIQUE (storage_scope, object_key),
     CONSTRAINT fk_file_assets_user_accounts FOREIGN KEY (uploader_account_id) REFERENCES user_accounts (id) ON DELETE RESTRICT,
     CONSTRAINT ck_file_assets_byte_size CHECK (byte_size > 0)
 );
@@ -26,6 +27,7 @@ COMMENT ON COLUMN file_assets.id IS '主键 ID';
 COMMENT ON COLUMN file_assets.uploader_account_id IS '上传账号 ID';
 COMMENT ON COLUMN file_assets.kind IS '文件类型';
 COMMENT ON COLUMN file_assets.status IS '资产状态';
+COMMENT ON COLUMN file_assets.storage_scope IS '存储桶范围';
 COMMENT ON COLUMN file_assets.object_key IS '对象键';
 COMMENT ON COLUMN file_assets.content_type IS '内容类型';
 COMMENT ON COLUMN file_assets.byte_size IS '字节大小';
