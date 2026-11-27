@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.media.model.enums.ImageContentType;
+import com.nep.tsuki.media.model.enums.ImageVariantPreset;
 import com.nep.tsuki.media.processing.MediaJobCode;
 import com.nep.tsuki.media.processing.MediaProcessResult;
 import com.nep.tsuki.media.utils.MediaUtils;
@@ -55,26 +56,42 @@ public class ImageProcessor {
     }
 
     /**
-     * 对本地图像文件进行校验、EXIF 方向校正、等比缩放及重编码
-     * 若缩放后的图像包含可见透明像素，则编码为 PNG；否则转换为 RGB 并按指定质量编码为 JPEG
+     * 按具名图片预设对本地图像文件执行校验、EXIF 方向校正、等比缩放及重编码
      *
      * @param sourceFile       待处理的本地图像文件
      * @param expectedMimeType 预期的 MIME 类型，用于与文件头实际格式比对
-     * @param maxEdgePx        输出图像长边的最大像素值（原图更小时不放大）
+     * @param preset           媒体模块维护的具名图片派生预设
+     * @return 处理成功返回编码后的图像数据与实际尺寸，失败返回对应的业务错误码
+     */
+    public MediaProcessResult<ImageProcessingResult> process(
+            Path sourceFile,
+            String expectedMimeType,
+            ImageVariantPreset preset) {
+        Objects.requireNonNull(preset, "preset 不能为空");
+        return process(sourceFile, expectedMimeType, preset.getMaxEdgePx(), preset.getJpegQuality());
+    }
+
+    /**
+     * 对本地图像文件进行校验、EXIF 方向校正、等比缩放（可选）及安全重编码
+     * 若处理后的图像包含可见透明像素，则编码为 PNG；否则转换为 RGB 并按指定质量编码为 JPEG
+     *
+     * @param sourceFile       待处理的本地图像文件
+     * @param expectedMimeType 预期的 MIME 类型，用于与文件头实际格式比对
+     * @param maxEdgePx        输出图像长边的最大像素值；为 null 时保持原图尺寸不缩放（原图更小时不放大）
      * @param jpegQuality      JPEG 压缩质量，范围 (0, 1]
      * @return 处理成功返回编码后的图像数据与实际尺寸，失败返回对应的业务错误码
      */
     public MediaProcessResult<ImageProcessingResult> process(
             Path sourceFile,
             String expectedMimeType,
-            int maxEdgePx,
+            Integer maxEdgePx,
             float jpegQuality) {
         // 基础入参校验
         Objects.requireNonNull(sourceFile, "sourceFile 不能为空");
         if (!StringUtils.hasText(expectedMimeType)) {
             throw new IllegalArgumentException("expectedMimeType 不能为空");
         }
-        if (maxEdgePx <= 0) {
+        if (maxEdgePx != null && maxEdgePx <= 0) {
             throw new IllegalArgumentException("maxEdgePx 必须大于 0");
         }
         if (jpegQuality <= 0.0f || jpegQuality > 1.0f) {
@@ -88,8 +105,10 @@ public class ImageProcessor {
         }
         ImageHeader header = headerResult.data();
 
-        // 计算等比缩放系数，上限为 1.0（只缩小不放大）
-        double scale = Math.min(1.0d, (double) maxEdgePx / Math.max(header.width, header.height));
+        // 计算等比缩放系数：未指定上限时保持 1.0（原尺寸），否则按长边等比缩小且不放大
+        double scale = maxEdgePx == null
+                ? 1.0d
+                : Math.min(1.0d, (double) maxEdgePx / Math.max(header.width, header.height));
 
         // 一次性完成图像解码、EXIF 方向自动校正与缩放
         BufferedImage processedImage;

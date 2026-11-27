@@ -20,12 +20,13 @@ import com.nep.tsuki.media.constants.MediaJobConstants;
 import com.nep.tsuki.media.constants.MediaRabbitConstants;
 import com.nep.tsuki.media.model.entity.MediaAsset;
 import com.nep.tsuki.media.model.entity.MediaJob;
+import com.nep.tsuki.media.model.enums.ImageContentType;
 import com.nep.tsuki.media.model.enums.MediaAssetStatus;
 import com.nep.tsuki.media.model.enums.MediaJobType;
 import com.nep.tsuki.media.processing.MediaJobCode;
 import com.nep.tsuki.media.processing.image.ImageProcessor;
-import com.nep.tsuki.media.service.MediaImageJobTxService;
-import com.nep.tsuki.media.service.MediaImageJobTxService.ClaimedImageJob;
+import com.nep.tsuki.media.service.MediaJobTxService;
+import com.nep.tsuki.media.service.MediaJobTxService.ClaimedMediaJob;
 import com.nep.tsuki.media.storage.MediaObjectStorage;
 import com.nep.tsuki.media.utils.MediaObjectPathUtils;
 
@@ -41,7 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MediaImageJobConsumer {
     private static final long DB_REQUEUE_BACKOFF_MILLIS = 1000L;
 
-    private final MediaImageJobTxService mediaImageJobTxService;
+    private final MediaJobTxService mediaJobTxService;
     private final MediaObjectStorage mediaObjectStorage;
     private final ImageProcessor imageProcessor;
 
@@ -54,9 +55,9 @@ public class MediaImageJobConsumer {
     public void onImageJobMessage(Message message) {
         long jobId = parseJobId(message);
 
-        ClaimedImageJob claimed;
+        ClaimedMediaJob claimed;
         try {
-            claimed = mediaImageJobTxService.claimForExecution(jobId, MediaJobType.PROCESS_IMAGE);
+            claimed = mediaJobTxService.claimForExecution(jobId, MediaJobType.PROCESS_IMAGE);
         } catch (DataAccessException | TransactionException ex) {
             log.error("领取图片处理任务时数据库访问异常，退避 1 秒后重投: jobId={}", jobId, ex);
             waitBeforeImmediateRequeue();
@@ -126,10 +127,19 @@ public class MediaImageJobConsumer {
             }
 
             // 将校验通过的原件归档至正式存储路径
+            ImageContentType originalContentType = ImageContentType.fromMimeType(asset.getContentType());
+            if (originalContentType == null) {
+                log.warn("资产声明的图片 MIME 类型不受支持: jobId={}, assetId={}, contentType={}", job.getId(), asset.getId(),
+                        asset.getContentType());
+                handleFailure(job, asset, MediaJobCode.INVALID_IMAGE, uploadedKeys);
+                return;
+            }
+
             String originalKey = MediaObjectPathUtils.imageOriginalKey(
                     asset.getId(),
                     job.getId(),
-                    job.getAttemptCount());
+                    job.getAttemptCount(),
+                    originalContentType);
             String archivedEtag;
             try {
                 archivedEtag = mediaObjectStorage.archiveObject(
@@ -204,7 +214,7 @@ public class MediaImageJobConsumer {
             String archivedEtag,
             List<String> uploadedKeys) {
         try {
-            boolean committed = mediaImageJobTxService.completeSucceeded(
+            boolean committed = mediaJobTxService.completeSucceeded(
                     job,
                     asset,
                     originalKey,
@@ -250,7 +260,7 @@ public class MediaImageJobConsumer {
                 && MediaJobConstants.retryDelayAfterAttempt(job.getAttemptCount()).isPresent();
 
         try {
-            boolean transitioned = mediaImageJobTxService.recordFailure(
+            boolean transitioned = mediaJobTxService.recordFailure(
                     job,
                     asset,
                     failureCode,
@@ -292,7 +302,7 @@ public class MediaImageJobConsumer {
 
         try {
             // 核对资产表与规格表中是否已存在对本次上传对象的引用
-            boolean referenced = mediaImageJobTxService.isAnyObjectReferenced(
+            boolean referenced = mediaJobTxService.isAnyObjectReferenced(
                     assetId,
                     originalKey,
                     List.of());

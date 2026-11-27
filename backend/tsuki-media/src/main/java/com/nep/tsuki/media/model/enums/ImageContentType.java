@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.http.MediaType;
@@ -33,12 +34,22 @@ public enum ImageContentType {
             .map(ImageContentType::getMimeType)
             .collect(Collectors.toUnmodifiableSet());
 
+    public static final Map<String, ImageContentType> MIME_TYPE_MAP = Arrays.stream(values())
+            .collect(Collectors.toUnmodifiableMap(ImageContentType::getMimeType, Function.identity()));
+
     public static final Map<String, ImageContentType> FORMAT_NAME_MAP = Arrays.stream(values())
             .flatMap(type -> type.formatNames.stream().map(name -> Map.entry(name, type)))
             .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
 
     public static boolean isSupported(String contentType) {
         return contentType != null && SUPPORTED_MIME_TYPES.contains(contentType);
+    }
+
+    public static ImageContentType fromMimeType(String mimeType) {
+        if (!StringUtils.hasText(mimeType)) {
+            return null;
+        }
+        return MIME_TYPE_MAP.get(mimeType.strip().toLowerCase(Locale.ROOT));
     }
 
     public static ImageContentType fromFormatName(String formatName) {

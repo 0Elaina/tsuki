@@ -24,18 +24,19 @@ import com.nep.tsuki.media.model.entity.MediaVariant;
 import com.nep.tsuki.media.model.enums.MediaAssetStatus;
 import com.nep.tsuki.media.model.enums.MediaJobType;
 import com.nep.tsuki.media.processing.MediaJobCode;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class MediaImageJobTxService {
+public class MediaJobTxService {
     private final MediaJobMapper mediaJobMapper;
     private final MediaAssetMapper mediaAssetMapper;
     private final MediaVariantMapper mediaVariantMapper;
     private final MediaJobsProperties mediaJobsProperties;
     private final TransactionTemplate transactionTemplate;
 
-    public record ClaimedImageJob(MediaJob job, MediaAsset asset) {
+    public record ClaimedMediaJob(MediaJob job, MediaAsset asset) {
     }
 
     /**
@@ -45,7 +46,7 @@ public class MediaImageJobTxService {
      * @param expectedType 期望的任务类型，用于校验类型匹配并计算租约时长
      * @return 抢占成功返回包含任务与资产的包装对象；若任务不存在、类型不符或状态不可抢占则返回 null
      */
-    public ClaimedImageJob claimForExecution(long jobId, MediaJobType expectedType) {
+    public ClaimedMediaJob claimForExecution(long jobId, MediaJobType expectedType) {
         Objects.requireNonNull(expectedType, "expectedType 不能为空");
         return transactionTemplate.execute(status -> {
             // 使用 UTC 当前时间计算本次执行的租约截止时间
@@ -64,7 +65,7 @@ public class MediaImageJobTxService {
 
             // 抢占成功后加载关联的媒体资产记录
             MediaAsset asset = mediaAssetMapper.selectById(job.getAssetId());
-            return new ClaimedImageJob(job, asset);
+            return new ClaimedMediaJob(job, asset);
         });
     }
 
@@ -74,8 +75,8 @@ public class MediaImageJobTxService {
      * @param job          当前执行中的媒体任务
      * @param asset        关联的媒体资产
      * @param originalKey  归档后的原始对象存储键（仅主任务推进资产状态时必填）
-     * @param archivedETag 归档后的原始对象 ETag
-     * @param variants     本次处理生成的媒体规格列表
+     * @param archivedEtag 归档后的原始对象 ETag
+     * @param variants     本次处理生成的媒体规格列表（仅归档原件时可传空列表）
      * @return 事务成功提交返回 true；若任务租约已失效或状态不匹配则返回 false
      */
     public boolean completeSucceeded(

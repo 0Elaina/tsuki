@@ -9,8 +9,8 @@ public final class MediaStorageConstants {
 
     public static final String IMAGE_WEBP_VALUE = "image/webp";
 
-    public static final String SOURCES_ROOT_PREFIX = "sources";
     public static final String ASSETS_ROOT_PREFIX = "assets";
+    public static final String VARIANTS_DIR_SEGMENT = "variants";
 
     public static final String ORIGINAL_FILENAME = "original";
 
