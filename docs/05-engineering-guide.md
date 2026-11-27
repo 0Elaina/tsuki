@@ -28,7 +28,7 @@
 - `tsuki.auth.refresh-user-idle-ttl`（`TSUKI_AUTH_REFRESH_USER_IDLE_TTL`，默认 `7d`，至少 `1d`）
 - `tsuki.auth.refresh-user-abs-ttl`（`TSUKI_AUTH_REFRESH_USER_ABS_TTL`，默认 `30d`，至少 `1d`）
 
-Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接与固定窗口限流脚本单例 `fixedWindowRateLimitScript`（`lua/fixed_window_rate_limit.lua`）由 `tsuki-infra` 统一提供，当前 `tsuki-auth`（登录限流）与 `tsuki-media`（上传签发限流）均复用该脚本。
+Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接与固定窗口限流脚本单例 `fixedWindowRateLimitScript`（`lua/fixed_window_rate_limit.lua`）由 `tsuki-infra` 统一提供，当前 `tsuki-auth`（登录限流）与 `tsuki-file`（上传签发限流）均复用该脚本。
 
 RabbitMQ 客户端依赖由 `tsuki-infra` 统一引入，连接参数与可靠性开关在 `tsuki-app` 主配置中集中维护（本地 `dev` 需在 `tsuki-app/config/application-dev.yml` 中按 `dev-infra/.env` 补齐凭据与端口）：
 
@@ -37,43 +37,43 @@ RabbitMQ 客户端依赖由 `tsuki-infra` 统一引入，连接参数与可靠�
 - `spring.rabbitmq.username`（`TSUKI_RABBITMQ_USERNAME`，默认 `guest`）
 - `spring.rabbitmq.password`（`TSUKI_RABBITMQ_PASSWORD`，默认空）
 - `spring.rabbitmq.virtual-host`（`TSUKI_RABBITMQ_VHOST`，默认 `/`）
-- 发布可靠性开关固定启用 `publisher-confirm-type: correlated`、`publisher-returns: true` 与 `template.mandatory: true`；同时 `spring.task.scheduling.pool.size` 设为 `2`，使 Outbox 批量派发（`MediaJobDispatcher`）与执行租期超时回收（`MediaJobReaper`）可并行调度。
-- `tsuki-media` 启动时自动声明持久化直连交换机 `tsuki.media.jobs`、持久化队列 `tsuki.media.image.process` 与绑定键 `image.process`，专用监听容器工厂固定 `prefetch = 1` 与 `AcknowledgeMode.AUTO`。
+- 发布可靠性开关固定启用 `publisher-confirm-type: correlated`、`publisher-returns: true` 与 `template.mandatory: true`；同时 `spring.task.scheduling.pool.size` 设为 `2`，使 Outbox 批量派发（`FileJobDispatcher`）与执行租期超时回收（`FileJobReaper`）可并行调度。
+- `tsuki-file` 启动时自动声明持久化直连交换机 `tsuki.file.jobs`、持久化队列 `tsuki.file.image.process` 与绑定键 `image.process`，专用监听容器工厂固定 `prefetch = 1` 与 `AcknowledgeMode.AUTO`。
 
 RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-infra` 装配（强制路径风格访问），运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
 
 - `tsuki.s3.endpoint`（`TSUKI_S3_ENDPOINT`）：后端内部调用的 HTTP(S) 根地址（含主机、无凭据、无查询参数、无片段、无子路径）；宿主机运行填 `http://127.0.0.1:9000`，共享网络内填 `http://rustfs:9000`
 - `tsuki.s3.upload-endpoint`（`TSUKI_S3_UPLOAD_ENDPOINT`）：浏览器直传预签名 URL 使用的 HTTP(S) 根地址（约束同上）；本地联调填宿主机可达地址 `http://127.0.0.1:9000`，生产填独立上传域名
 - `tsuki.s3.region`（`TSUKI_S3_REGION`，默认 `us-east-1`）
-- `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`）：项目私有桶名，本地 `dev` 填 `tsuki-dev-media-private`（生产使用 `tsuki-prod-media-private`）
+- `tsuki.s3.bucket`（`TSUKI_S3_BUCKET`）：项目私有桶名，本地 `dev` 填 `tsuki-dev-file-private`（生产使用 `tsuki-prod-file-private`）
 - `tsuki.s3.access-key`（`TSUKI_S3_ACCESS_KEY`，本地复用共享 RustFS 访问密钥，生产可换用最小权限凭证）
 - `tsuki.s3.secret-key`（`TSUKI_S3_SECRET_KEY`，本地复用共享 RustFS 对应密钥，生产可换用最小权限凭证）
 
-媒体暂存上传规则由 `tsuki-media` 中的 `tsuki.media.upload` 绑定（均带默认值，可按环境覆盖）：
+文件暂存上传规则由 `tsuki-file` 中的 `tsuki.file.upload` 绑定（均带默认值，可按环境覆盖）：
 
-- `tsuki.media.upload.signature-ttl`：预签名 PUT 有效期，默认 `10m`，允许范围 `1m` 至 `15m`
-- `tsuki.media.upload.max-image-bytes`：允许上传的单张图片最大字节数，默认 `10485760`（10 MiB），须大于 `0`
-- `tsuki.media.upload.admin-sign-limit`：管理端账号每 60 秒允许的图片直传签发次数，默认 `60`，须大于 `0`
-- `tsuki.media.upload.user-sign-limit`：用户端账号每 60 秒允许的图片直传签发次数，默认 `10`，须大于 `0`
+- `tsuki.file.upload.signature-ttl`：预签名 PUT 有效期，默认 `10m`，允许范围 `1m` 至 `15m`
+- `tsuki.file.upload.max-image-bytes`：允许上传的单张图片最大字节数，默认 `10485760`（10 MiB），须大于 `0`
+- `tsuki.file.upload.admin-sign-limit`：管理端账号每 60 秒允许的文件直传签发次数，默认 `60`，须大于 `0`
+- `tsuki.file.upload.user-sign-limit`：用户端账号每 60 秒允许的文件直传签发次数，默认 `10`，须大于 `0`
 
-媒体异步任务参数由 `tsuki-media` 中的 `tsuki.media.jobs` 绑定（均带默认值，可按环境覆盖）：
+文件异步任务参数由 `tsuki-file` 中的 `tsuki.file.jobs` 绑定（均带默认值，可按环境覆盖）：
 
-- `tsuki.media.jobs.image-lease`：图片处理任务单次执行租期，默认 `2m`，允许范围 `10s` 至 `30m`
-- `tsuki.media.jobs.reap-interval`：租期超时任务回收扫描间隔，默认 `10s`，允许范围 `1s` 至 `5m`
-- `tsuki.media.jobs.image-concurrency`：单实例图片消费者并发数，默认 `1`，允许范围 `1` 至 `16`（保持 `prefetch = 1`）
+- `tsuki.file.jobs.image-lease`：图片处理任务单次执行租期，默认 `2m`，允许范围 `10s` 至 `30m`
+- `tsuki.file.jobs.reap-interval`：租期超时任务回收扫描间隔，默认 `10s`，允许范围 `1s` 至 `5m`
+- `tsuki.file.jobs.image-concurrency`：单实例图片消费者并发数，默认 `1`，允许范围 `1` 至 `16`（保持 `prefetch = 1`）
 
 现有预签名 PUT 已将声明的 `Content-Length` 与 `If-None-Match: *` 签入请求签名，客户端直传须直接以原始 `File` 或 `Blob` 作为请求体，由浏览器自动计算并发送 `Content-Length`，且同一对象键不可重复覆盖。上传直传、确认与后台处理边界及私有桶路径如下：
 
-- **浏览器直传暂存区**：`incoming/image/{UTC年}/{UTC月}/{UTC日}/{uploadId}/source`（7 天生命周期自动回收）。
-- **上传确认**：`MediaUploadService.confirmImageUpload` 仅通过 S3 `HEAD` 核验元数据，随后在 `TransactionTemplate` 短事务内原子更新 `media_assets` 为 `UPLOAD_CONFIRMED` 并登记 `PROCESS_IMAGE` 任务（Outbox 模式）。
-- **后台异步校验与原件归档**：`MediaJobDispatcher` 分批领取待派发任务并通过 RabbitMQ 发布确认机制投递；`MediaImageJobConsumer` 消费时带 `If-Match` 条件 `GetObject` 流式落盘核对字节数，经 `ImageProcessor.validate` 校验真实格式、尺寸上限（单边 `8192px`、总像素 `2500` 万）与完整解码后，带 `If-None-Match: *` 条件 `PutObject` 归档至 `assets/image/{assetId}/original-{jobId}-{attemptCount}.{ext}` 并将资产置为 `READY`。
-- **按需派生规格**：`tsuki-media` 作为底层媒体服务，不在上传入库阶段擅自派生业务图；派生规格集中以具名预设维护（当前原图级安全重编码预设 `ImageVariantPreset.FULL`），后续由业务模块按需触发并落盘至独立版本化路径 `assets/image/{assetId}/variants/{fileStem}-{versionId}.{ext}`。
+- **浏览器直传暂存区**：`incoming/{kind}/{UTC年}/{UTC月}/{UTC日}/{uploadId}/source`（7 天生命周期自动回收）。
+- **上传确认**：`FileUploadService.confirmImageUpload` 仅通过 S3 `HEAD` 核验元数据，随后在 `TransactionTemplate` 短事务内原子更新 `file_assets` 为 `UPLOAD_CONFIRMED` 并登记 `PROCESS_IMAGE` 任务（Outbox 模式）。
+- **后台异步校验与原件归档**：`FileJobDispatcher` 分批领取待派发任务并通过 RabbitMQ 发布确认机制投递；`FileImageJobConsumer` 消费时带 `If-Match` 条件 `GetObject` 流式落盘核对字节数，经 `ImageProcessor.validateAndProbe` 校验真实格式、尺寸上限（单边 `8192px`、总像素 `2500` 万）与完整解码并探测原图宽高后，带 `If-None-Match: *` 条件 `PutObject` 归档至 `assets/image/{assetId}/original-{jobId}-{attemptCount}.{ext}`，同时将原件路径、ETag 与探测元数据写入 `file_assets` 并将资产置为 `READY`。
+- **按需派生规格**：`tsuki-file` 作为底层文件服务，不在上传入库阶段擅自派生业务图；派生规格按文件类型以具名预设集中维护（当前原图级安全重编码预设 `ImageVariantPreset.FULL`），后续由业务模块按需触发并落盘至独立版本化路径 `assets/{kind}/{assetId}/variants/{fileStem}-{versionId}.{ext}`。
 
-本地共享 RustFS 桶边界准备（每项目、每环境采用一个私有桶和一个交付桶，交付桶 `tsuki-dev-media-delivery` 留待发布能力落地时创建）：
+本地共享 RustFS 桶边界准备（每项目、每环境采用一个私有桶和一个交付桶，交付桶 `tsuki-dev-file-delivery` 留待发布能力落地时创建）：
 
-- 创建私有桶 `tsuki-dev-media-private`，本地复用共享 RustFS 管理员凭证通过桶名与对象前缀实现项目隔离；生产部署时可单独配置仅授权目标桶/前缀的访问凭证
-- 为 `tsuki-dev-media-private` 配置前缀 `incoming/image/` 的生命周期规则，默认 `7` 天自动过期，用于清理联调或放弃上传产生的残留对象
-- 为 `tsuki-dev-media-private` 配置桶级 CORS：允许来源 `http://localhost:5173`、方法 `PUT`、请求头 `content-type` 与 `if-none-match`、预检缓存 `600` 秒（前端开发端口变更时同步调整来源；若本地 RustFS 暂不支持桶级 CORS，浏览器联调需在具备 CORS 支持的环境继续）
+- 创建私有桶 `tsuki-dev-file-private`，本地复用共享 RustFS 管理员凭证通过桶名与对象前缀实现项目隔离；生产部署时可单独配置仅授权目标桶/前缀的访问凭证
+- 为 `tsuki-dev-file-private` 配置前缀 `incoming/` 的生命周期规则，默认 `7` 天自动过期，用于清理各类型文件联调或放弃上传产生的残留对象
+- 为 `tsuki-dev-file-private` 配置桶级 CORS：允许来源 `http://localhost:5173`、方法 `PUT`、请求头 `content-type` 与 `if-none-match`、预检缓存 `600` 秒（前端开发端口变更时同步调整来源；若本地 RustFS 暂不支持桶级 CORS，浏览器联调需在具备 CORS 支持的环境继续）
 
 ### 生产环境配置（prod profile）
 
