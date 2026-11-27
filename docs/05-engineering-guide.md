@@ -30,6 +30,16 @@
 
 Redis 连接参数在 `tsuki-app` 公共配置中默认指向 `127.0.0.1:6379`、空密码，可通过 `TSUKI_REDIS_HOST`、`TSUKI_REDIS_PORT`、`TSUKI_REDIS_PASSWORD` 覆盖（若本地共享 Redis 端口非 `6379` 或设置了密码，需在 `application-dev.yml` 中同步填写）。底层连接与固定窗口限流脚本单例 `fixedWindowRateLimitScript`（`lua/fixed_window_rate_limit.lua`）由 `tsuki-infra` 统一提供，当前 `tsuki-auth`（登录限流）与 `tsuki-media`（上传签发限流）均复用该脚本。
 
+RabbitMQ 客户端依赖由 `tsuki-infra` 统一引入，连接参数与可靠性开关在 `tsuki-app` 主配置中集中维护（本地 `dev` 需在 `tsuki-app/config/application-dev.yml` 中按 `dev-infra/.env` 补齐凭据与端口）：
+
+- `spring.rabbitmq.host`（`TSUKI_RABBITMQ_HOST`，默认 `127.0.0.1`）
+- `spring.rabbitmq.port`（`TSUKI_RABBITMQ_PORT`，默认 `5672`）
+- `spring.rabbitmq.username`（`TSUKI_RABBITMQ_USERNAME`，默认 `guest`）
+- `spring.rabbitmq.password`（`TSUKI_RABBITMQ_PASSWORD`，默认空）
+- `spring.rabbitmq.virtual-host`（`TSUKI_RABBITMQ_VHOST`，默认 `/`）
+- 发布可靠性开关固定启用 `publisher-confirm-type: correlated`、`publisher-returns: true` 与 `template.mandatory: true`；同时 `spring.task.scheduling.pool.size` 设为 `2`，使 Outbox 批量派发（`MediaJobDispatcher`）与执行租期超时回收（`MediaJobReaper`）可并行调度。
+- `tsuki-media` 启动时自动声明持久化直连交换机 `tsuki.media.jobs`、持久化队列 `tsuki.media.image.process` 与绑定键 `image.process`，专用监听容器工厂固定 `prefetch = 1` 与 `AcknowledgeMode.AUTO`。
+
 RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-infra` 装配（强制路径风格访问），运行参数在 `tsuki-app` 主配置中集中绑定，本地 `dev` 启动前需在 `tsuki-app/config/application-dev.yml`（或环境变量）中提供以下参数（除 `region` 外均需非空）：
 
 - `tsuki.s3.endpoint`（`TSUKI_S3_ENDPOINT`）：后端内部调用的 HTTP(S) 根地址（含主机、无凭据、无查询参数、无片段、无子路径）；宿主机运行填 `http://127.0.0.1:9000`，共享网络内填 `http://rustfs:9000`
@@ -46,7 +56,18 @@ RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-
 - `tsuki.media.upload.admin-sign-limit`：管理端账号每 60 秒允许的图片直传签发次数，默认 `60`，须大于 `0`
 - `tsuki.media.upload.user-sign-limit`：用户端账号每 60 秒允许的图片直传签发次数，默认 `10`，须大于 `0`
 
-现有预签名 PUT 已将声明的 `Content-Length` 与 `If-None-Match: *` 签入请求签名，客户端直传须直接以原始 `File` 或 `Blob` 作为请求体，由浏览器自动计算并发送 `Content-Length`，且同一对象键不可重复覆盖。
+媒体异步任务参数由 `tsuki-media` 中的 `tsuki.media.jobs` 绑定（均带默认值，可按环境覆盖）：
+
+- `tsuki.media.jobs.image-lease`：图片处理任务单次执行租期，默认 `2m`，允许范围 `10s` 至 `30m`
+- `tsuki.media.jobs.reap-interval`：租期超时任务回收扫描间隔，默认 `10s`，允许范围 `1s` 至 `5m`
+- `tsuki.media.jobs.image-concurrency`：单实例图片消费者并发数，默认 `1`，允许范围 `1` 至 `16`（保持 `prefetch = 1`）
+
+现有预签名 PUT 已将声明的 `Content-Length` 与 `If-None-Match: *` 签入请求签名，客户端直传须直接以原始 `File` 或 `Blob` 作为请求体，由浏览器自动计算并发送 `Content-Length`，且同一对象键不可重复覆盖。上传直传、确认与后台处理边界及私有桶路径如下：
+
+- **浏览器直传暂存区**：`incoming/image/{UTC年}/{UTC月}/{UTC日}/{uploadId}/source`（7 天生命周期自动回收）。
+- **上传确认**：`MediaUploadService.confirmImageUpload` 仅通过 S3 `HEAD` 核验元数据，随后在 `TransactionTemplate` 短事务内原子更新 `media_assets` 为 `UPLOAD_CONFIRMED` 并登记 `PROCESS_IMAGE` 任务（Outbox 模式）。
+- **后台异步校验与原件归档**：`MediaJobDispatcher` 分批领取待派发任务并通过 RabbitMQ 发布确认机制投递；`MediaImageJobConsumer` 消费时带 `If-Match` 条件 `GetObject` 流式落盘核对字节数，经 `ImageProcessor.validate` 校验真实格式、尺寸上限（单边 `8192px`、总像素 `2500` 万）与完整解码后，带 `If-None-Match: *` 条件 `PutObject` 归档至 `assets/image/{assetId}/original-{jobId}-{attemptCount}.{ext}` 并将资产置为 `READY`。
+- **按需派生规格**：`tsuki-media` 作为底层媒体服务，不在上传入库阶段擅自派生业务图；派生规格集中以具名预设维护（当前原图级安全重编码预设 `ImageVariantPreset.FULL`），后续由业务模块按需触发并落盘至独立版本化路径 `assets/image/{assetId}/variants/{fileStem}-{versionId}.{ext}`。
 
 本地共享 RustFS 桶边界准备（每项目、每环境采用一个私有桶和一个交付桶，交付桶 `tsuki-dev-media-delivery` 留待发布能力落地时创建）：
 
@@ -59,7 +80,7 @@ RustFS（S3 兼容对象存储）的 `S3Client` 与 `S3Presigner` 均由 `tsuki-
 生产环境通过 `SPRING_PROFILES_ACTIVE=prod`（或 `--spring.profiles.active=prod`）激活 `prod` profile，支持通过环境变量或同目录下的 `config/application-prod.yml` 提供敏感配置：
 
 - 数据库连接：`TSUKI_DB_URL`、`TSUKI_DB_USERNAME`、`TSUKI_DB_PASSWORD`（数据库驱动由 `tsuki-infra` 提供，数据源参数与 Flyway 迁移由 `tsuki-app` 管理）
-- 认证、Redis 与对象存储：复用上述 `TSUKI_AUTH_*`、`TSUKI_REDIS_*` 与 `TSUKI_S3_*` 环境变量
+- 认证、Redis、RabbitMQ 与对象存储：复用上述 `TSUKI_AUTH_*`、`TSUKI_REDIS_*`、`TSUKI_RABBITMQ_*` 与 `TSUKI_S3_*` 环境变量
 - 反代与监听：`prod` 固定监听 `server.address: 127.0.0.1`，启用 `server.forward-headers-strategy: native`，并将 `server.tomcat.remoteip.internal-proxies` 限定为 `"127\\.0\\.0\\.1"`，由同机 HTTPS 反向代理终止 TLS 并转发真实客户端地址。
 
 ### 初始化管理员账号
