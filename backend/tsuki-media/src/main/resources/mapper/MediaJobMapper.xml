@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nep.tsuki.media.mapper.MediaJobMapper">
     <!-- 原子抢占一批待派发的媒体处理任务 -->
-    <select id="claimDispatchBatch" affectData="true" resultType="com.nep.tsuki.media.model.dto.DispatchedMediaJob">
+    <select id="claimDispatchBatch" affectData="true" flushCache="true" useCache="false" resultType="com.nep.tsuki.media.model.dto.DispatchedMediaJob">
         WITH claimed AS (
         SELECT id FROM media_jobs
         WHERE
@@ -39,4 +39,54 @@
             #{jobId}
         </foreach>
     </update>
+    <!-- 查询已过期且当前处于运行中状态的媒体任务，并加行级排他锁 -->
+    <select id="selectExpiredRunningForUpdate" resultType="com.nep.tsuki.media.model.dto.ExpiredMediaJob">
+        SELECT id, asset_id, type, attempt_count
+        FROM media_jobs
+        WHERE status = 'RUNNING'
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+        ORDER BY lease_until, id
+        LIMIT #{batchSize}
+        FOR UPDATE SKIP LOCKED
+    </select>
+    <!-- 批量将已过期的媒体任务重新调度为待重试状态 -->
+    <select id="rescheduleExpiredBatchForRetry" affectData="true" flushCache="true" useCache="false" resultType="java.lang.Long">
+        UPDATE media_jobs
+        SET status = 'PENDING',
+            available_at = #{nextAvailableAt},
+            dispatch_after = #{nextAvailableAt},
+            lease_until = NULL,
+            dispatch_token = NULL,
+            dispatched_at = NULL,
+            failure_code = #{failureCode},
+            updated_at = #{now}
+        WHERE status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+            AND id IN
+        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
+            #{jobId}
+        </foreach>
+        RETURNING id
+    </select>
+    <!-- 批量将已过期的媒体任务标记为最终失败状态 -->
+    <select id="markExpiredBatchFailed" affectData="true" flushCache="true" useCache="false" resultType="java.lang.Long">
+        UPDATE media_jobs
+        SET status = 'FAILED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = #{failureCode},
+            updated_at = #{now}
+        WHERE status = 'RUNNING'
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+            AND id IN
+        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
+            #{jobId}
+        </foreach>
+        RETURNING id
+    </select>
 </mapper>

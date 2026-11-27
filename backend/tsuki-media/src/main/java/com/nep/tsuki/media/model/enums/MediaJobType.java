@@ -20,10 +20,12 @@ import lombok.Getter;
 public enum MediaJobType {
 
     /** 图片处理任务 */
-    PROCESS_IMAGE(MediaRabbitConstants.IMAGE_PROCESS_ROUTING_KEY);
+    PROCESS_IMAGE(MediaRabbitConstants.IMAGE_PROCESS_ROUTING_KEY, true);
 
     /** 对应的 RabbitMQ 路由键 */
     private final String routingKey;
+    /** 任务类型是推进 media_assets 终态的主任务 */
+    private final boolean advancesAssetStatus;
 
     public static final List<String> ALL_TYPE_NAMES = Arrays.stream(values())
             .map(MediaJobType::name)

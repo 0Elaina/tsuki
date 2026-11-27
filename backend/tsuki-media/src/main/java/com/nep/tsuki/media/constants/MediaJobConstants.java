@@ -16,6 +16,8 @@ public final class MediaJobConstants {
 
     /** 单次回收过期/卡死任务的批量上限 */
     public static final int REAP_BATCH_SIZE = 50;
+    /** 最大批量回收次数（防止死循环） */
+    public static final int MAX_REAP_BATCHES_PER_RUN = 10;
 
     /** 任务最大尝试次数 */
     public static final int MAX_ATTEMPTS = 3;

@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.nep.tsuki.media.model.dto.DispatchedMediaJob;
+import com.nep.tsuki.media.model.dto.ExpiredMediaJob;
 import com.nep.tsuki.media.model.entity.MediaJob;
 
 @Mapper
@@ -42,4 +43,45 @@ public interface MediaJobMapper extends BaseMapper<MediaJob> {
             @Param("jobIds") List<Long> jobIds,
             @Param("batchToken") String batchToken,
             @Param("dispatchedAt") OffsetDateTime dispatchedAt);
+
+    /**
+     * 查询已过期且当前处于运行中状态的媒体任务，并加行级排他锁
+     *
+     * @param now       当前基准时间，用于判断任务是否已超过预设的过期时间
+     * @param batchSize 单次批量查询并锁定的最大任务数量
+     * @return 已过期且处于运行中状态的媒体任务列表
+     */
+    List<ExpiredMediaJob> selectExpiredRunningForUpdate(
+            @Param("now") OffsetDateTime now,
+            @Param("batchSize") int batchSize);
+
+    /**
+     * 批量将已过期的媒体任务重新调度为待重试状态
+     *
+     * @param jobIds               待批量重调度的媒体任务主键 ID 列表
+     * @param expectedAttemptCount 期望的当前已尝试次数
+     * @param nextAvailableAt      下次允许重新调度执行的时间点
+     * @param failureCode          本次触发重调度的错误码
+     * @param now                  当前基准时间，用于更新记录的修改时间等字段
+     * @return 实际成功重调度的媒体任务主键 ID 列表
+     */
+    List<Long> rescheduleExpiredBatchForRetry(
+            @Param("jobIds") List<Long> jobIds,
+            @Param("expectedAttemptCount") int expectedAttemptCount,
+            @Param("nextAvailableAt") OffsetDateTime nextAvailableAt,
+            @Param("failureCode") String failureCode,
+            @Param("now") OffsetDateTime now);
+
+    /**
+     * 批量将已过期的媒体任务标记为最终失败状态
+     *
+     * @param jobIds      待批量标记为失败的媒体任务主键 ID 列表
+     * @param failureCode 导致任务最终失败的错误码
+     * @param now         当前基准时间，用于更新记录的修改时间或失败完结时间
+     * @return 实际成功标记为失败的媒体任务主键 ID 列表
+     */
+    List<Long> markExpiredBatchFailed(
+            @Param("jobIds") List<Long> jobIds,
+            @Param("failureCode") String failureCode,
+            @Param("now") OffsetDateTime now);
 }
