@@ -89,4 +89,64 @@
         </foreach>
         RETURNING id
     </select>
+    <!-- 原子抢占指定任务进入执行状态，并设置执行租约截止时间 -->
+    <select id="claimForExecution" affectData="true" flushCache="true" useCache="false" resultType="com.nep.tsuki.media.model.entity.MediaJob">
+        UPDATE media_jobs
+        SET status = 'RUNNING',
+            attempt_count = attempt_count + 1,
+            lease_until = #{leaseUntil},
+            dispatched_at = COALESCE(dispatched_at, #{now}),
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND type = #{expectedType}
+            AND status = 'PENDING'
+            AND available_at &lt;= #{now}
+        RETURNING id, asset_id, type, status, attempt_count, available_at, lease_until, dispatch_after, dispatch_token, dispatched_at, failure_code, created_at, updated_at
+    </select>
+    <!-- 将运行中的任务标记为执行成功 -->
+    <update id="markJobSucceeded">
+        UPDATE media_jobs
+        SET status = 'SUCCEEDED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = NULL,
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until &gt; #{now}
+    </update>
+    <!-- 将运行中失败的任务重新调度为待重试状态 -->
+    <update id="rescheduleRunningForRetry">
+        UPDATE media_jobs
+        SET status = 'PENDING',
+            available_at = #{nextAvailableAt},
+            dispatch_after = #{nextAvailableAt},
+            lease_until = NULL,
+            dispatch_token = NULL,
+            dispatched_at = NULL,
+            failure_code = #{failureCode},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until &gt; #{now}
+    </update>
+    <!-- 将运行中的任务标记为最终失败状态（不再重试） -->
+    <update id="markRunningFailed">
+        UPDATE media_jobs
+        SET status = 'FAILED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = #{failureCode},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until &gt; #{now}
+    </update>
 </mapper>
