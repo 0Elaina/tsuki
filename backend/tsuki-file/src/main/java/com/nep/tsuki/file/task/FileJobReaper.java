@@ -70,7 +70,7 @@ public class FileJobReaper implements SchedulingConfigurer {
     }
 
     /**
-     * 扫描并回收单批次租期过期的任务：事务内逐条推进状态，事务外按桶静默清理残留的尝试产物
+     * 扫描并回收单批次租期过期的任务：仅收集确认提交的尝试产物，并在 finally 中确保已提交对象一定得到清理
      *
      * @return {@code true} 表示本批已达上限可能仍有积压；{@code false} 表示本轮已排空
      */
@@ -81,31 +81,38 @@ public class FileJobReaper implements SchedulingConfigurer {
             return false;
         }
 
-        // 按逻辑存储桶归集需要回收的尝试级产物键，避免在数据库事务内发起 S3 网络 I/O
+        // 仅在短事务确认提交后收集待清理产物；finally 保证即便后续记录抛异常也不会漏删前面已提交任务的旧产物
         Map<FileStorageScope, List<String>> artifactsByScope = new EnumMap<>(FileStorageScope.class);
-        for (Long jobId : candidateJobIds) {
-            reapSingleJob(jobId, artifactsByScope);
+        try {
+            for (Long jobId : candidateJobIds) {
+                Map.Entry<FileStorageScope, String> committedArtifact = reapSingleJob(jobId);
+                if (committedArtifact != null) {
+                    artifactsByScope.computeIfAbsent(committedArtifact.getKey(), key -> new ArrayList<>())
+                            .add(committedArtifact.getValue());
+                }
+            }
+        } finally {
+            artifactsByScope.forEach(fileObjectStorage::deleteQuietly);
         }
 
-        artifactsByScope.forEach(fileObjectStorage::deleteQuietly);
         return candidateJobIds.size() == FileJobConstants.REAP_BATCH_SIZE;
     }
 
     /**
      * 在独立短事务内按 Asset -> Variant -> Job 锁序回收单个租期超时任务
      *
-     * @param jobId            候选超时任务主键 ID
-     * @param artifactsByScope 待回收尝试产物的按桶收集映射
+     * @param jobId 候选超时任务主键 ID
+     * @return 事务成功提交且存在需要清理的尝试产物时返回对应的 (逻辑桶, 对象键)；否则返回 {@code null}
      */
-    private void reapSingleJob(long jobId, Map<FileStorageScope, List<String>> artifactsByScope) {
+    private Map.Entry<FileStorageScope, String> reapSingleJob(long jobId) {
         FileJob snapshot = fileJobMapper.selectById(jobId);
         if (snapshot == null
                 || !FileJobStatus.RUNNING.name().equals(snapshot.getStatus())
                 || snapshot.getLeaseUntil() == null) {
-            return;
+            return null;
         }
 
-        transactionTemplate.executeWithoutResult(status -> {
+        return transactionTemplate.execute(status -> {
             // 严格遵循 Asset -> Variant -> Job 锁序，避免与业务绑定/撤回事务产生死锁
             FileAsset asset = fileAssetMapper.selectByIdForUpdate(snapshot.getAssetId());
             FileVariant variant = snapshot.getVariantId() != null
@@ -118,7 +125,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                     || !FileJobStatus.RUNNING.name().equals(job.getStatus())
                     || job.getLeaseUntil() == null
                     || job.getLeaseUntil().isAfter(now)) {
-                return;
+                return null;
             }
 
             Optional<FileJobType> jobTypeOptional = FileJobType.findByName(job.getType());
@@ -133,12 +140,12 @@ public class FileJobReaper implements SchedulingConfigurer {
                     log.warn("回收未知类型超时文件任务: jobId={}, assetId={}, type={}, attemptCount={}",
                             job.getId(), job.getAssetId(), job.getType(), job.getAttemptCount());
                 }
-                return;
+                return null;
             }
 
             FileJobType jobType = jobTypeOptional.get();
 
-            // 1. 若目标资产或衍生物已撤回/删除/终态，直接标为 CANCELLED 并登记清理本次尝试产物
+            // 1. 若目标资产或衍生物已撤回/删除/终态，直接标为 CANCELLED 并返回待清理尝试产物
             if (shouldCancelExpiredJob(jobType, asset, variant)) {
                 int updated = fileJobMapper.markExpiredCancelled(
                         job.getId(),
@@ -147,11 +154,11 @@ public class FileJobReaper implements SchedulingConfigurer {
                         "任务租期到期且目标记录已失效，标记为已取消",
                         now);
                 if (updated == 1) {
-                    collectAttemptArtifact(jobType, job, variant, artifactsByScope);
                     log.warn("回收已失效目标的超时任务并取消: jobId={}, assetId={}, variantId={}, type={}, attemptCount={}",
                             job.getId(), job.getAssetId(), job.getVariantId(), jobType, job.getAttemptCount());
+                    return resolveAttemptArtifact(jobType, job, variant);
                 }
-                return;
+                return null;
             }
 
             // 2. 清理队列任务采用持续自动退避，永不进入终态失败，达到 6h 稳态时升级为 ERROR 日志
@@ -174,7 +181,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                                 job.getId(), job.getAssetId(), job.getVariantId(), jobType, job.getAttemptCount());
                     }
                 }
-                return;
+                return null;
             }
 
             // 3. 交互队列任务在重试预算内按 30s / 120s 退避重排
@@ -189,11 +196,11 @@ public class FileJobReaper implements SchedulingConfigurer {
                         "任务执行租期已超时，已重排等待重试",
                         now);
                 if (updated == 1) {
-                    collectAttemptArtifact(jobType, job, variant, artifactsByScope);
                     log.warn("回收租期超时交互任务并重排: jobId={}, assetId={}, variantId={}, type={}, attemptCount={}",
                             job.getId(), job.getAssetId(), job.getVariantId(), jobType, job.getAttemptCount());
+                    return resolveAttemptArtifact(jobType, job, variant);
                 }
-                return;
+                return null;
             }
 
             // 4. 交互队列任务耗尽重试次数：标为 FAILED 并同步推进对应资产或衍生物终态
@@ -205,38 +212,36 @@ public class FileJobReaper implements SchedulingConfigurer {
                     now);
             if (updated == 1) {
                 advanceTerminalFailureTarget(jobType, asset, variant, now);
-                collectAttemptArtifact(jobType, job, variant, artifactsByScope);
                 log.warn("回收租期超时交互任务并置为终态失败: jobId={}, assetId={}, variantId={}, type={}, attemptCount={}",
                         job.getId(), job.getAssetId(), job.getVariantId(), jobType, job.getAttemptCount());
+                return resolveAttemptArtifact(jobType, job, variant);
             }
+            return null;
         });
     }
 
-    private void collectAttemptArtifact(
+    private Map.Entry<FileStorageScope, String> resolveAttemptArtifact(
             FileJobType jobType,
             FileJob job,
-            FileVariant variant,
-            Map<FileStorageScope, List<String>> artifactsByScope) {
+            FileVariant variant) {
         if (job.getAttemptCount() == null || job.getAttemptCount() <= 0) {
-            return;
+            return null;
         }
-        switch (jobType) {
-            case VALIDATE_UPLOAD -> artifactsByScope
-                    .computeIfAbsent(FileStorageScope.PRIVATE, key -> new ArrayList<>())
-                    .add(FileObjectPathUtils.originalKey(job.getAssetId(), job.getId(), job.getAttemptCount()));
+        return switch (jobType) {
+            case VALIDATE_UPLOAD -> Map.entry(
+                    FileStorageScope.PRIVATE,
+                    FileObjectPathUtils.originalKey(job.getAssetId(), job.getId(), job.getAttemptCount()));
             case GENERATE_VARIANT -> {
-                if (job.getVariantId() != null && variant != null && StringUtils.hasText(variant.getStorageScope())) {
-                    artifactsByScope
-                            .computeIfAbsent(FileStorageScope.valueOf(variant.getStorageScope()),
-                                    key -> new ArrayList<>())
-                            .add(FileObjectPathUtils.variantKey(job.getAssetId(), job.getVariantId(), job.getId(),
-                                    job.getAttemptCount()));
+                if (job.getVariantId() == null || variant == null || !StringUtils.hasText(variant.getStorageScope())) {
+                    yield null;
                 }
+                yield Map.entry(
+                        FileStorageScope.valueOf(variant.getStorageScope()),
+                        FileObjectPathUtils.variantKey(job.getAssetId(), job.getVariantId(), job.getId(),
+                                job.getAttemptCount()));
             }
-            case CLEANUP_ASSET, CLEANUP_VARIANT -> {
-                // 清理任务不产生新的对象存储产物
-            }
-        }
+            case CLEANUP_ASSET, CLEANUP_VARIANT -> null;
+        };
     }
 
     private boolean shouldCancelExpiredJob(FileJobType jobType, FileAsset asset, FileVariant variant) {

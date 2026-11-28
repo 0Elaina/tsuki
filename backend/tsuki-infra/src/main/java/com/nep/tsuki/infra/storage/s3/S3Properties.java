@@ -66,6 +66,19 @@ public class S3Properties {
         }
     }
 
+    @AssertTrue(message = "S3 deliveryBucket 与 deliveryBaseUrl 必须成对配置或同时留空")
+    public boolean isDeliveryConfigPaired() {
+        return StringUtils.hasText(deliveryBucket) == StringUtils.hasText(deliveryBaseUrl);
+    }
+
+    @AssertTrue(message = "S3 deliveryBucket 不能与 privateBucket 使用同一个存储桶")
+    public boolean isDeliveryBucketDistinct() {
+        if (!StringUtils.hasText(privateBucket) || !StringUtils.hasText(deliveryBucket)) {
+            return true;
+        }
+        return !privateBucket.strip().equals(deliveryBucket.strip());
+    }
+
     /**
      * 解析规范化后的公开交付访问根地址（去除末尾多余的 "/"）
      */

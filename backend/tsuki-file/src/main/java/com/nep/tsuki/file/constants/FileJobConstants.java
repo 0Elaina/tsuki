@@ -9,6 +9,8 @@ public final class FileJobConstants {
 
     /** 单次扫描派发的任务批量上限 */
     public static final int DISPATCH_BATCH_SIZE = 50;
+    /** 单次定时调度最多轮转派发的轮数上限（每轮依次扫描交互与清理队列） */
+    public static final int MAX_DISPATCH_ROUNDS_PER_RUN = 10;
     /** 抢占待派发批次时的租约时间（秒） */
     public static final long DISPATCH_CLAIM_DELAY_SECONDS = 15L;
     /** 投递后等待 Broker 发布确认（Publisher Confirm）的超时时间（秒） */

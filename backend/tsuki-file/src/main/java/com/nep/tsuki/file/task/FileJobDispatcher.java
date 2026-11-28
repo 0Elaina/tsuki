@@ -31,6 +31,9 @@ import com.nep.tsuki.file.model.enums.FileJobType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 文件任务 Outbox 派发器，按交互/清理双队列公平轮转批量投递到 RabbitMQ，并在 Broker 确认后按任务类型设置补派时间
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -42,51 +45,75 @@ public class FileJobDispatcher {
     private record PendingConfirm(Long jobId, FileJobType jobType, CorrelationData correlationData) {
     }
 
+    private enum BatchOutcome {
+        /** 本批满载且正常确认，可能仍有积压 */
+        HAS_MORE,
+        /** 当前队列已无更多到期任务 */
+        DRAINED,
+        /** Broker 发送/确认或数据库异常，本轮应立即休眠退避 */
+        FAILED
+    }
+
     /**
-     * 定时轮询派发待处理任务：每轮先派一批交互任务，再派一批清理任务，有积压时公平轮转，排空后延迟 1s 再扫描
+     * 定时轮询派发待处理任务：每轮优先检查交互队列再检查清理队列，最多轮转固定轮数，排空或异常后休眠 1 秒再扫描
      */
     @Scheduled(fixedDelay = 1000L)
     public void dispatchPendingJobs() {
-        boolean interactiveActive = !FileJobType.INTERACTIVE_TYPE_NAMES.isEmpty();
-        boolean cleanupActive = !FileJobType.CLEANUP_TYPE_NAMES.isEmpty();
-
-        while (interactiveActive || cleanupActive) {
+        for (int round = 0; round < FileJobConstants.MAX_DISPATCH_ROUNDS_PER_RUN; round++) {
             if (Thread.currentThread().isInterrupted()) {
                 break;
             }
-            if (interactiveActive) {
-                interactiveActive = dispatchSingleBatch(FileJobType.INTERACTIVE_TYPE_NAMES);
+
+            // 每轮均重新检查交互队列，防止清理队列持续积压期间新确认的上传或衍生物请求被饿死
+            BatchOutcome interactiveOutcome = dispatchSingleBatch(FileJobType.INTERACTIVE_TYPE_NAMES);
+            if (interactiveOutcome == BatchOutcome.FAILED) {
+                break;
             }
-            if (cleanupActive) {
-                cleanupActive = dispatchSingleBatch(FileJobType.CLEANUP_TYPE_NAMES);
+
+            BatchOutcome cleanupOutcome = dispatchSingleBatch(FileJobType.CLEANUP_TYPE_NAMES);
+            if (cleanupOutcome == BatchOutcome.FAILED) {
+                break;
+            }
+
+            if (interactiveOutcome == BatchOutcome.DRAINED && cleanupOutcome == BatchOutcome.DRAINED) {
+                break;
             }
         }
     }
 
     /**
-     * 派发单个队列分组的一批文件任务到 RabbitMQ
+     * 派发单个队列分组的一批到期任务到 RabbitMQ，并按 Publisher Confirm 结果回写按类型区分的补派时间
      *
-     * @return true 表示本批次满载且正常投递，可继续轮转；false 表示无积压、未满载或发生异常/超时
+     * @param supportedTypes 本批次领取的任务类型名称集合
+     * @return 本批次派发结果（有积压、已排空或发生故障）
      */
-    private boolean dispatchSingleBatch(List<String> supportedTypes) {
+    private BatchOutcome dispatchSingleBatch(List<String> supportedTypes) {
         if (supportedTypes.isEmpty()) {
-            return false;
+            return BatchOutcome.DRAINED;
         }
 
+        // 1. 短事务跳过锁批量抢占到期任务并写入 15s 派发租约与批次令牌
         String batchToken = UUID.randomUUID().toString();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime claimUntil = now.plusSeconds(FileJobConstants.DISPATCH_CLAIM_DELAY_SECONDS);
 
-        List<FileJob> claimedJobs = transactionTemplate.execute(status -> fileJobMapper.claimDispatchBatch(
-                supportedTypes,
-                now,
-                claimUntil,
-                batchToken,
-                FileJobConstants.DISPATCH_BATCH_SIZE));
+        List<FileJob> claimedJobs;
+        try {
+            claimedJobs = transactionTemplate.execute(status -> fileJobMapper.claimDispatchBatch(
+                    supportedTypes,
+                    now,
+                    claimUntil,
+                    batchToken,
+                    FileJobConstants.DISPATCH_BATCH_SIZE));
+        } catch (DataAccessException ex) {
+            log.error("抢占待派发文件任务批次失败, batchToken={}", batchToken, ex);
+            return BatchOutcome.FAILED;
+        }
         if (claimedJobs == null || claimedJobs.isEmpty()) {
-            return false;
+            return BatchOutcome.DRAINED;
         }
 
+        // 2. 在单条信道上下文内连续投递持久化消息，携带 CorrelationData 追踪确认与退回
         List<PendingConfirm> pendingConfirms = new ArrayList<>(claimedJobs.size());
         boolean sendFailed = false;
         try {
@@ -120,9 +147,10 @@ public class FileJobDispatcher {
         }
 
         if (pendingConfirms.isEmpty()) {
-            return false;
+            return BatchOutcome.FAILED;
         }
 
+        // 3. 等待本批次 Publisher Confirm，超时后仅回写已确认且未被 Return 的记录
         CompletableFuture<?>[] futures = pendingConfirms.stream()
                 .map(pc -> pc.correlationData().getFuture())
                 .toArray(CompletableFuture[]::new);
@@ -150,6 +178,7 @@ public class FileJobDispatcher {
             }
         }
 
+        // 4. 从准备回写该批确认的时刻起，按任务类型写入各自的补派时间（+30s / +60s / +5min）
         if (!ackedIdsByType.isEmpty()) {
             OffsetDateTime dispatchedAt = OffsetDateTime.now(ZoneOffset.UTC);
             try {
@@ -161,7 +190,7 @@ public class FileJobDispatcher {
                 });
             } catch (DataAccessException ex) {
                 log.error("回写文件任务投递确认状态失败, batchToken={}, ackedCount={}", batchToken, ackedCount, ex);
-                return false;
+                return BatchOutcome.FAILED;
             }
         }
 
@@ -170,6 +199,11 @@ public class FileJobDispatcher {
                     batchToken, claimedJobs.size(), pendingConfirms.size(), ackedCount);
         }
 
-        return !sendFailed && !confirmTimeout && claimedJobs.size() == FileJobConstants.DISPATCH_BATCH_SIZE;
+        if (sendFailed || confirmTimeout) {
+            return BatchOutcome.FAILED;
+        }
+        return claimedJobs.size() == FileJobConstants.DISPATCH_BATCH_SIZE
+                ? BatchOutcome.HAS_MORE
+                : BatchOutcome.DRAINED;
     }
 }
