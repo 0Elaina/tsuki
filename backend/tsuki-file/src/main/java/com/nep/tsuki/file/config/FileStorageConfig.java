@@ -14,7 +14,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(FileUploadProperties.class)
+@EnableConfigurationProperties({ FileUploadProperties.class, FileAccessProperties.class })
 public class FileStorageConfig {
 
     /**
@@ -37,7 +37,10 @@ public class FileStorageConfig {
      * 注册基于 S3 兼容协议的文件对象存储实现
      */
     @Bean
-    FileObjectStorage fileObjectStorage(S3Client s3Client, S3Properties s3Properties) {
-        return new S3FileObjectStorage(s3Client, s3Properties);
+    FileObjectStorage fileObjectStorage(
+            S3Client s3Client,
+            S3Presigner s3Presigner,
+            S3Properties s3Properties) {
+        return new S3FileObjectStorage(s3Client, s3Presigner, s3Properties);
     }
 }

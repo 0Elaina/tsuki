@@ -1,32 +1,46 @@
 package com.nep.tsuki.file.storage;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collection;
 
+import com.nep.tsuki.file.model.dto.ObjectCopyOutcome;
+import com.nep.tsuki.file.model.dto.PresignedDownload;
+import com.nep.tsuki.file.model.dto.StorageObjectRef;
+import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
 
 public interface FileObjectStorage {
-    /**
-     * 从对象存储下载文件到本地指定路径，并在下载过程中校验对象的一致性
-     *
-     * @param objectKey        对象存储中的文件 Key
-     * @param expectedEtag     期望的对象 ETag
-     * @param expectedByteSize 期望的文件字节大小
-     * @param targetFile       本地目标文件路径
-     * @return 下载结果状态码
-     */
-    FileJobCode downloadToFile(String objectKey, String expectedEtag, long expectedByteSize, Path targetFile);
 
     /**
-     * 将本地已校验的源文件归档上传到目标路径
-     *
-     * @param sourceKey   源对象存储 Key
-     * @param sourceEtag  源对象 ETag
-     * @param targetKey   归档目标对象存储 Key
-     * @param localFile   已下载并校验通过的本地临时文件路径
-     * @param contentType 文件 MIME 类型
-     * @param byteSize    本地文件精确字节大小
-     * @return 上传成功后由服务端生成的目标对象 ETag
+     * 从指定逻辑桶下载文件到本地路径，并在下载过程中核对 ETag 与精确字节数
+     */
+    FileJobCode downloadToFile(
+            FileStorageScope scope,
+            String objectKey,
+            String expectedEtag,
+            long expectedByteSize,
+            Path targetFile);
+
+    /**
+     * 从私有桶下载文件到本地路径（便捷重载）
+     */
+    default FileJobCode downloadToFile(String objectKey, String expectedEtag, long expectedByteSize, Path targetFile) {
+        return downloadToFile(FileStorageScope.PRIVATE, objectKey, expectedEtag, expectedByteSize, targetFile);
+    }
+
+    /**
+     * 使用 S3 CopyObject 归档对象（仅带源端 CopySourceIfMatch 条件，源对象变化或不存在时返回对应错误码）
+     */
+    ObjectCopyOutcome copyObjectIfMatch(
+            FileStorageScope sourceScope,
+            String sourceKey,
+            String sourceEtag,
+            FileStorageScope targetScope,
+            String targetKey);
+
+    /**
+     * 兼容旧归档方法（将在执行器升级为 CopyObject 后移除）
      */
     String archiveObject(
             String sourceKey,
@@ -37,19 +51,34 @@ public interface FileObjectStorage {
             long byteSize);
 
     /**
-     * 将内存中的字节数组原子写入对象存储
-     *
-     * @param objectKey   目标对象存储 Key
-     * @param content     待上传的非空字节数组
-     * @param contentType 文件 MIME 类型
-     * @return 上传成功后由服务端生成的对象 ETag
+     * 使用普通 PUT 向指定逻辑桶写入尝试级独占对象（如衍生物产物）
      */
-    String putObjectIfAbsent(String objectKey, byte[] content, String contentType);
+    String putObject(FileStorageScope scope, String objectKey, byte[] content, String contentType);
 
     /**
-     * 静默批量删除对象存储中的指定 Key 集合
-     *
-     * @param objectKeys 待清理的对象存储 Key 集合
+     * 为指定逻辑桶的对象签发临时 GET 预签名下载链接
      */
-    void deleteQuietly(Collection<String> objectKeys);
+    PresignedDownload presignGet(FileStorageScope scope, String objectKey, Duration ttl);
+
+    /**
+     * 按逻辑桶分组执行严格批量删除：对象已不存在（NoSuchKey）视为成功，任何其他单项或批次失败抛出异常
+     */
+    void deleteObjects(Collection<StorageObjectRef> objects);
+
+    /**
+     * 按逻辑桶分组静默批量清理对象（用于尝试产物补偿与租期回收，记录日志但不抛异常）
+     */
+    void deleteQuietly(Collection<StorageObjectRef> objects);
+
+    /**
+     * 静默批量清理私有桶中的指定 Key 集合
+     */
+    void deleteQuietlyInScope(FileStorageScope scope, Collection<String> objectKeys);
+
+    /**
+     * 兼容旧私有桶静默清理入口
+     */
+    default void deleteQuietly(Collection<String> objectKeys) {
+        deleteQuietlyInScope(FileStorageScope.PRIVATE, objectKeys);
+    }
 }
