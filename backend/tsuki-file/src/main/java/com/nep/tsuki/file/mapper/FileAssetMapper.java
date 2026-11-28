@@ -1,6 +1,7 @@
 package com.nep.tsuki.file.mapper;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -13,25 +14,12 @@ import com.nep.tsuki.file.model.entity.FileAsset;
 public interface FileAssetMapper extends BaseMapper<FileAsset> {
 
     /**
-     * 批量删除过期的未确认记录
-     *
-     * @param cutoff    过期截止时间
-     * @param batchSize 单次批量删除的最大数量限制
-     * @return 实际删除的记录条数
+     * 按主键加行级排他锁查询文件资产（用于严格遵循 Asset -> Variant -> Job 锁序）
      */
-    int deleteExpiredUnconfirmedBatch(@Param("cutoff") OffsetDateTime cutoff, @Param("batchSize") int batchSize);
+    FileAsset selectByIdForUpdate(@Param("id") long id);
 
     /**
-     * 将归档完成的文件资产推进为就绪态并写入原件路径、ETag 与探测元数据
-     *
-     * @param assetId        文件资产主键 ID
-     * @param expectedStatus 乐观校验的当前资产状态
-     * @param targetStatus   目标资产状态
-     * @param objectKey      归档后的正式对象键
-     * @param etag           归档后的对象 ETag
-     * @param metadata       探测到的原件扩展元数据（可为 null）
-     * @param now            当前 UTC 时间
-     * @return 实际更新的记录条数
+     * 将归档完成的文件资产推进为 READY 并写入正式原件键、ETag、探测元数据与未绑定过期截止时间
      */
     int markReady(
             @Param("assetId") long assetId,
@@ -40,5 +28,27 @@ public interface FileAssetMapper extends BaseMapper<FileAsset> {
             @Param("objectKey") String objectKey,
             @Param("etag") String etag,
             @Param("metadata") Map<String, Object> metadata,
+            @Param("unboundExpiresAt") OffsetDateTime unboundExpiresAt,
             @Param("now") OffsetDateTime now);
+
+    /**
+     * 将校验或处理失败的文件资产推进为 REJECTED 或 FAILED 并记录原因
+     */
+    int markValidationTerminalFailure(
+            @Param("assetId") long assetId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("targetStatus") String targetStatus,
+            @Param("failureCode") String failureCode,
+            @Param("failureMessage") String failureMessage,
+            @Param("now") OffsetDateTime now);
+
+    /**
+     * 批量将超过确认期限且仍为 PENDING_UPLOAD 的记录置为 EXPIRED（保留元数据）
+     */
+    int expirePendingUploadsBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+
+    /**
+     * 查询已到期且尚未绑定业务记录的 READY 资产主键列表
+     */
+    List<Long> selectExpiredUnboundIds(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
 }

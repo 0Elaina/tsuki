@@ -4,5 +4,9 @@ public enum FileAssetStatus {
     PENDING_UPLOAD,
     UPLOAD_CONFIRMED,
     READY,
-    PROCESSING_FAILED
+    REJECTED,
+    FAILED,
+    EXPIRED,
+    DELETING,
+    DELETED
 }

@@ -4,5 +4,6 @@ public enum FileJobStatus {
     PENDING,
     RUNNING,
     SUCCEEDED,
-    FAILED
+    FAILED,
+    CANCELLED
 }

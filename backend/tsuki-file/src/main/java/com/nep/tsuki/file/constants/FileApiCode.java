@@ -17,5 +17,21 @@ public final class FileApiCode {
     public static final ApiCode FILE_UPLOAD_OBJECT_MISSING = new ApiCode(HttpStatus.CONFLICT,
             "FILE_UPLOAD_OBJECT_MISSING", "暂存对象尚未上传完成");
     public static final ApiCode FILE_UPLOAD_METADATA_MISMATCH = new ApiCode(HttpStatus.CONFLICT,
-            "FILE_UPLOAD_METADATA_MISMATCH", "已上传对象的类型或大小与声明不符");
+            "FILE_UPLOAD_METADATA_MISMATCH", "已上传对象的类型、大小或校验信息与声明不符");
+    public static final ApiCode FILE_ASSET_NOT_FOUND = new ApiCode(HttpStatus.NOT_FOUND,
+            "FILE_ASSET_NOT_FOUND", "文件资产不存在");
+    public static final ApiCode FILE_ASSET_NOT_READY = new ApiCode(HttpStatus.CONFLICT,
+            "FILE_ASSET_NOT_READY", "文件资产尚未就绪或不可用");
+    public static final ApiCode FILE_ASSET_OWNER_CONFLICT = new ApiCode(HttpStatus.CONFLICT,
+            "FILE_ASSET_OWNER_CONFLICT", "文件资产已被其他业务记录绑定");
+    public static final ApiCode FILE_ASSET_EXPIRED = new ApiCode(HttpStatus.GONE,
+            "FILE_ASSET_EXPIRED", "文件资产未及时绑定已过期");
+    public static final ApiCode FILE_ASSET_NOT_BOUND = new ApiCode(HttpStatus.CONFLICT,
+            "FILE_ASSET_NOT_BOUND", "文件资产尚未绑定业务记录");
+    public static final ApiCode FILE_VARIANT_NOT_FOUND = new ApiCode(HttpStatus.NOT_FOUND,
+            "FILE_VARIANT_NOT_FOUND", "文件衍生物不存在");
+    public static final ApiCode FILE_VARIANT_NOT_READY = new ApiCode(HttpStatus.CONFLICT,
+            "FILE_VARIANT_NOT_READY", "文件衍生物尚未就绪或已撤回");
+    public static final ApiCode FILE_VARIANT_NOT_RETRYABLE = new ApiCode(HttpStatus.CONFLICT,
+            "FILE_VARIANT_NOT_RETRYABLE", "仅失败状态的文件衍生物允许重试");
 }

@@ -9,7 +9,7 @@ Tsuki 是一个由个人独立开发和长期维护的在线音乐网站，参�
 - `tsuki-app`：负责应用启动、模块组装、Flyway 数据库迁移，以及数据源、Redis、RabbitMQ、调度池、MyBatis-Plus 和对象存储等运行参数配置。
 - `tsuki-infra`：集中管理 PostgreSQL 驱动、MyBatis-Plus 装配（分页拦截器、UTC 自动填充、`PostgresJsonbTypeHandler` 与公共分页适配器 `MybatisPageAdapter`）、Redis 与 RabbitMQ（`spring-boot-starter-amqp`）自动装配以及 RustFS（`S3Client` 与 `S3Presigner`）客户端配置；供启动模块装配及需要持久化或中间件能力的业务模块复用。
 - `tsuki-common`：仅提供统一响应、公共异常处理、Web 参数校验和解耦后的公共分页类型（`PageQuery`、`PageResult`），不依赖具体持久化或中间件框架。
-- 业务模块（如认证、用户、分类与标签、文件等）：各自负责自己的接口或内部业务契约、业务规则、实体与数据访问，并在 POM 中显式声明直接使用的依赖；其中 `tsuki-file` 作为底层文件服务，封装通用直传预签名与确认（Outbox 入队）、基于 RabbitMQ 的后台原件校验探测与归档（含批量确认派发与租期超时回收），以及按文件类型维护的处理器与具名派生预设（当前提供图片处理器与原图级预设 `ImageVariantPreset.FULL`）。跨模块调用通过公开接口进行，构建依赖可直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
+- 业务模块（如认证、用户、分类与标签、文件等）：各自负责自己的接口或内部业务契约、业务规则、实体与数据访问，并在 POM 中显式声明直接使用的依赖；其中 `tsuki-file` 作为底层文件服务，对外提供 `FileUploadService`、`FileAssetService`、`FileVariantService` 与内部地址解析 `FileAccessService`，覆盖直传预签名与确认、基于 RabbitMQ 双队列（交互/清理）的后台原件校验归档（`CopyObject`）、按需版本化衍生物生成（当前 `ImageVariantPreset.FULL` 第 `1` 版）、业务单归属绑定与换绑、过期巡检及失败持续退避的物理清理闭环。跨模块调用通过公开接口进行，构建依赖可直接审查。 [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) · [Spring 应用模块约定](https://docs.spring.io/spring-modulith/reference/fundamentals.html)
 
 ```mermaid
 flowchart LR
@@ -36,8 +36,8 @@ flowchart LR
 | --- | --- |
 | Java 21、Spring Boot 4.1.2、Maven | 采用 Java 21 作为运行基线，使用 Spring Boot 的 Web 和依赖管理能力。Maven 管理构建、模块聚合与显式依赖。 [Spring Boot 系统要求](https://docs.spring.io/spring-boot/system-requirements.html) · [Maven 多模块指南](https://maven.apache.org/guides/mini/guide-multiple-modules.html) |
 | PostgreSQL、Flyway、MyBatis-Plus | PostgreSQL 保存业务记录，Flyway 统一执行版本化数据库迁移。MyBatis-Plus 使用 Boot 4 专用 starter，复用通用持久化操作，同时保留按业务需要编写 SQL 的能力。 [Flyway 接入](https://docs.spring.io/spring-boot/4.1/how-to/data-initialization.html) · [MyBatis-Plus 安装](https://baomidou.com/en/getting-started/install/) |
-| RustFS、S3 SDK | 按项目与环境划分私有桶（`tsuki-{env}-file-private`）和交付桶（`tsuki-{env}-file-delivery`），以对象前缀区分暂存直传（`incoming/{kind}/...`）、归档原件与派生规格（`assets/{kind}/{assetId}/...`）与已发布交付（`published/...`）生命周期。客户端通过 `S3Presigner` 签发的 `If-None-Match: *` 预签名 PUT 直传暂存区，后端通过内部 `S3Client` 核验元数据并异步校验归档。 [RustFS S3 兼容矩阵](https://docs.rustfs.com/en/reference/s3-compatibility) |
-| RabbitMQ、Spring AMQP | 承载文件上传确认后的异步任务派发与单条消费解耦，配合 PostgreSQL Outbox（`file_jobs`）、批量发布确认（Publisher Confirms/Returns）与租期超时回收，保证后台原件核验与归档的可靠投递与幂等执行。 |
+| RustFS、S3 SDK | 按项目与环境划分私有桶（`tsuki-{env}-file-private`）和交付桶（`tsuki-{env}-file-delivery`），以对象前缀区分暂存直传（`staging/{kind}/...`，7 天生命周期回收）、已校验私有原件（`originals/{assetId}/{jobId}/{attempt}/source`）与私有/公开衍生物（`variants/{assetId}/{variantId}/{jobId}/{attempt}/output`）。客户端通过 `S3Presigner` 签发的 `If-None-Match: *` 预签名 PUT 直传暂存区，后端通过内部 `S3Client` 核验元数据并异步校验、`CopyObject` 归档与按需生成/清理衍生物。 [RustFS S3 兼容矩阵](https://docs.rustfs.com/en/reference/s3-compatibility) |
+| RabbitMQ、Spring AMQP | 承载文件异步任务的双队列隔离投递（交互队列 `tsuki.file.interactive` 与清理队列 `tsuki.file.cleanup`），配合 PostgreSQL Outbox（`file_jobs`）、批量发布确认与按类型补派、租期超时回收及清理任务持续退避，保证校验、派生与物理删除的可靠执行。 |
 | Vue 3、TypeScript、Vite、Vue Router | Vue 负责界面，TypeScript 为组件和接口数据提供类型检查，Vite 负责开发与构建，Vue Router 管理应用内路由。 [Vue 官方脚手架](https://vuejs.org/guide/quick-start.html) |
 | Naive UI、Tailwind CSS | Naive UI 是整个前端项目（管理端与用户端）的核心组件库，交互组件、排版与反馈优先使用 Naive UI 并复用各端统一的主题配置与 `NGlobalStyle`；Tailwind CSS 负责外层页面容器定位与局部间距。 [Naive UI](https://github.com/tusen-ai/naive-ui) · [Tailwind CSS](https://tailwindcss.com/docs/installation/using-vite) |
 | TanStack Query、Pinia、VueUse | TanStack Query 管理服务端数据的获取、缓存和刷新；Pinia 管理需要跨页面共享的客户端状态；通用浏览器持久化与响应式能力优先复用 `@vueuse/core`，不重复造轮子。 [TanStack Vue Query](https://tanstack.com/query/latest/docs/framework/vue/overview) · [Pinia](https://pinia.vuejs.org/introduction.html) · [VueUse](https://vueuse.org/) |

@@ -4,6 +4,7 @@
     <resultMap id="fileJobResultMap" type="com.nep.tsuki.file.model.entity.FileJob">
         <id column="id" property="id"/>
         <result column="asset_id" property="assetId"/>
+        <result column="variant_id" property="variantId"/>
         <result column="type" property="type"/>
         <result column="status" property="status"/>
         <result column="attempt_count" property="attemptCount"/>
@@ -21,10 +22,17 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
-    <!-- 幂等插入任务：若存在相同活跃防重键（dedup_key 非空且处于 PENDING/RUNNING），则跳过插入 -->
+    <select id="selectByIdForUpdate" resultMap="fileJobResultMap">
+        SELECT *
+        FROM file_jobs
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <insert id="insertIfNotActive">
         INSERT INTO file_jobs (
             asset_id,
+            variant_id,
             type,
             status,
             attempt_count,
@@ -36,6 +44,7 @@
             updated_at
         ) VALUES (
             #{job.assetId},
+            #{job.variantId},
             #{job.type},
             #{job.status},
             COALESCE(#{job.attemptCount}, 0),
@@ -50,7 +59,6 @@
         DO NOTHING
     </insert>
 
-    <!-- 原子抢占一批待派发的文件处理任务 -->
     <select id="claimDispatchBatch" affectData="true" flushCache="true" useCache="false" resultType="com.nep.tsuki.file.model.entity.FileJob">
         WITH claimed AS (
             SELECT id FROM file_jobs
@@ -74,11 +82,10 @@
         RETURNING j.id, j.type
     </select>
 
-    <!-- 批量确认指定批次的任务已完成派发（清理抢占租约并记录派发时间） -->
     <update id="markDispatchedBatch">
         UPDATE file_jobs
         SET dispatched_at = #{dispatchedAt},
-            dispatch_after = NULL,
+            dispatch_after = #{redeliverAfter},
             dispatch_token = NULL,
             updated_at = #{dispatchedAt}
         WHERE status = 'PENDING'
@@ -89,63 +96,16 @@
         </foreach>
     </update>
 
-    <!-- 查询已过期且当前处于运行中状态的文件任务，并加行级排他锁 -->
-    <select id="selectExpiredRunningForUpdate" resultType="com.nep.tsuki.file.model.entity.FileJob">
-        SELECT id, asset_id, type, attempt_count
+    <select id="selectExpiredRunningIds" resultType="java.lang.Long">
+        SELECT id
         FROM file_jobs
         WHERE status = 'RUNNING'
             AND lease_until IS NOT NULL
             AND lease_until &lt;= #{now}
         ORDER BY lease_until, id
         LIMIT #{batchSize}
-        FOR UPDATE SKIP LOCKED
     </select>
 
-    <!-- 批量将已过期的文件任务重新调度为待重试状态 -->
-    <select id="rescheduleExpiredBatchForRetry" affectData="true" flushCache="true" useCache="false" resultType="java.lang.Long">
-        UPDATE file_jobs
-        SET status = 'PENDING',
-            available_at = #{nextAvailableAt},
-            dispatch_after = #{nextAvailableAt},
-            lease_until = NULL,
-            dispatch_token = NULL,
-            dispatched_at = NULL,
-            failure_code = #{failureCode},
-            failure_message = #{failureMessage},
-            updated_at = #{now}
-        WHERE status = 'RUNNING'
-            AND attempt_count = #{expectedAttemptCount}
-            AND lease_until IS NOT NULL
-            AND lease_until &lt;= #{now}
-            AND id IN
-        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
-            #{jobId}
-        </foreach>
-        RETURNING id
-    </select>
-
-    <!-- 批量将已过期的文件任务标记为最终失败状态 -->
-    <select id="markExpiredBatchFailed" affectData="true" flushCache="true" useCache="false" resultType="java.lang.Long">
-        UPDATE file_jobs
-        SET status = 'FAILED',
-            lease_until = NULL,
-            dispatch_after = NULL,
-            dispatch_token = NULL,
-            failure_code = #{failureCode},
-            failure_message = #{failureMessage},
-            finished_at = #{now},
-            updated_at = #{now}
-        WHERE status = 'RUNNING'
-            AND lease_until IS NOT NULL
-            AND lease_until &lt;= #{now}
-            AND id IN
-        <foreach collection="jobIds" item="jobId" open="(" separator="," close=")">
-            #{jobId}
-        </foreach>
-        RETURNING id
-    </select>
-
-    <!-- 原子抢占指定任务进入执行状态，并设置执行租约截止时间 -->
     <select id="claimForExecution" affectData="true" flushCache="true" useCache="false" resultMap="fileJobResultMap">
         UPDATE file_jobs
         SET status = 'RUNNING',
@@ -156,13 +116,15 @@
             dispatch_token = NULL,
             updated_at = #{now}
         WHERE id = #{jobId}
-            AND type = #{expectedType}
             AND status = 'PENDING'
             AND available_at &lt;= #{now}
-        RETURNING id, asset_id, type, status, attempt_count, available_at, lease_until, dispatch_after, dispatch_token, dispatched_at, dedup_key, payload, failure_code, failure_message, finished_at, created_at, updated_at
+            AND type IN
+        <foreach collection="allowedTypes" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+        RETURNING id, asset_id, variant_id, type, status, attempt_count, available_at, lease_until, dispatch_after, dispatch_token, dispatched_at, dedup_key, payload, failure_code, failure_message, finished_at, created_at, updated_at
     </select>
 
-    <!-- 将运行中的任务标记为执行成功 -->
     <update id="markJobSucceeded">
         UPDATE file_jobs
         SET status = 'SUCCEEDED',
@@ -179,7 +141,6 @@
             AND lease_until &gt; #{now}
     </update>
 
-    <!-- 将运行中失败的任务重新调度为待重试状态 -->
     <update id="rescheduleRunningForRetry">
         UPDATE file_jobs
         SET status = 'PENDING',
@@ -197,7 +158,6 @@
             AND lease_until &gt; #{now}
     </update>
 
-    <!-- 将运行中的任务标记为最终失败状态（不再重试） -->
     <update id="markRunningFailed">
         UPDATE file_jobs
         SET status = 'FAILED',
@@ -213,4 +173,115 @@
             AND attempt_count = #{expectedAttemptCount}
             AND lease_until &gt; #{now}
     </update>
+
+    <update id="markRunningCancelled">
+        UPDATE file_jobs
+        SET status = 'CANCELLED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            finished_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until &gt; #{now}
+    </update>
+
+    <update id="rescheduleExpiredForRetry">
+        UPDATE file_jobs
+        SET status = 'PENDING',
+            available_at = #{nextAvailableAt},
+            dispatch_after = #{nextAvailableAt},
+            lease_until = NULL,
+            dispatch_token = NULL,
+            dispatched_at = NULL,
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+    </update>
+
+    <update id="markExpiredFailed">
+        UPDATE file_jobs
+        SET status = 'FAILED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            finished_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+    </update>
+
+    <update id="markExpiredCancelled">
+        UPDATE file_jobs
+        SET status = 'CANCELLED',
+            lease_until = NULL,
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            finished_at = #{now},
+            updated_at = #{now}
+        WHERE id = #{jobId}
+            AND status = 'RUNNING'
+            AND attempt_count = #{expectedAttemptCount}
+            AND lease_until IS NOT NULL
+            AND lease_until &lt;= #{now}
+    </update>
+
+    <update id="cancelPendingByAsset">
+        UPDATE file_jobs
+        SET status = 'CANCELLED',
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            finished_at = #{now},
+            updated_at = #{now}
+        WHERE asset_id = #{assetId}
+            AND status = 'PENDING'
+            AND type IN
+        <foreach collection="jobTypes" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </update>
+
+    <update id="cancelPendingByVariant">
+        UPDATE file_jobs
+        SET status = 'CANCELLED',
+            dispatch_after = NULL,
+            dispatch_token = NULL,
+            finished_at = #{now},
+            updated_at = #{now}
+        WHERE variant_id = #{variantId}
+            AND status = 'PENDING'
+            AND type IN
+        <foreach collection="jobTypes" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </update>
+
+    <delete id="purgeFinishedBatch">
+        DELETE FROM file_jobs
+        WHERE id IN (
+            SELECT id
+            FROM file_jobs
+            WHERE finished_at IS NOT NULL
+                AND finished_at &lt;= #{cutoff}
+            ORDER BY finished_at, id
+            LIMIT #{batchSize}
+            FOR UPDATE SKIP LOCKED
+        )
+    </delete>
 </mapper>
