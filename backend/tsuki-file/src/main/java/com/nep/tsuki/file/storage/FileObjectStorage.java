@@ -23,13 +23,6 @@ public interface FileObjectStorage {
             Path targetFile);
 
     /**
-     * 从私有桶下载文件到本地路径（便捷重载）
-     */
-    default FileJobCode downloadToFile(String objectKey, String expectedEtag, long expectedByteSize, Path targetFile) {
-        return downloadToFile(FileStorageScope.PRIVATE, objectKey, expectedEtag, expectedByteSize, targetFile);
-    }
-
-    /**
      * 使用 S3 CopyObject 归档对象（仅带源端 CopySourceIfMatch 条件，源对象变化或不存在时返回对应错误码）
      */
     ObjectCopyOutcome copyObjectIfMatch(
@@ -38,17 +31,6 @@ public interface FileObjectStorage {
             String sourceEtag,
             FileStorageScope targetScope,
             String targetKey);
-
-    /**
-     * 兼容旧归档方法（将在执行器升级为 CopyObject 后移除）
-     */
-    String archiveObject(
-            String sourceKey,
-            String sourceEtag,
-            String targetKey,
-            Path localFile,
-            String contentType,
-            long byteSize);
 
     /**
      * 使用普通 PUT 向指定逻辑桶写入尝试级独占对象（如衍生物产物）
@@ -69,16 +51,4 @@ public interface FileObjectStorage {
      * 按逻辑桶分组静默批量清理对象（用于尝试产物补偿与租期回收，记录日志但不抛异常）
      */
     void deleteQuietly(Collection<StorageObjectRef> objects);
-
-    /**
-     * 静默批量清理私有桶中的指定 Key 集合
-     */
-    void deleteQuietlyInScope(FileStorageScope scope, Collection<String> objectKeys);
-
-    /**
-     * 兼容旧私有桶静默清理入口
-     */
-    default void deleteQuietly(Collection<String> objectKeys) {
-        deleteQuietlyInScope(FileStorageScope.PRIVATE, objectKeys);
-    }
 }

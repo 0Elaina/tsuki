@@ -27,6 +27,8 @@ public class FileAsset {
     private String kind;
     private String status;
     private String storageScope;
+    private String stagingKey;
+    private String stagingEtag;
     private String objectKey;
     private String contentType;
     private Long byteSize;
@@ -36,8 +38,17 @@ public class FileAsset {
     @TableField(jdbcType = JdbcType.OTHER, typeHandler = PostgresJsonbTypeHandler.class)
     private Map<String, Object> metadata;
 
+    private String ownerType;
+    private Long ownerId;
+
     private OffsetDateTime confirmExpiresAt;
     private OffsetDateTime confirmedAt;
+    private OffsetDateTime boundAt;
+    private OffsetDateTime unboundExpiresAt;
+
+    private String failureCode;
+    private String failureMessage;
+    private OffsetDateTime purgedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

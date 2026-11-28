@@ -1,35 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nep.tsuki.file.mapper.FileVariantMapper">
-    <!-- 批量插入文件交付规格记录 -->
-    <insert id="insertBatch">
-        INSERT INTO file_variants (
-            asset_id,
-            code,
-            storage_scope,
-            object_key,
-            content_type,
-            byte_size,
-            width,
-            height,
-            metadata,
-            created_at,
-            updated_at
-        ) VALUES
-        <foreach collection="variants" item="variant" separator=",">
-            (
-                #{variant.assetId},
-                #{variant.code},
-                #{variant.storageScope},
-                #{variant.objectKey},
-                #{variant.contentType},
-                #{variant.byteSize},
-                #{variant.width},
-                #{variant.height},
-                #{variant.metadata,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
-                #{now},
-                #{now}
-            )
-        </foreach>
-    </insert>
+    <resultMap id="fileVariantResultMap" type="com.nep.tsuki.file.model.entity.FileVariant">
+        <id column="id" property="id"/>
+        <result column="asset_id" property="assetId"/>
+        <result column="code" property="code"/>
+        <result column="preset_revision" property="presetRevision"/>
+        <result column="status" property="status"/>
+        <result column="storage_scope" property="storageScope"/>
+        <result column="object_key" property="objectKey"/>
+        <result column="content_type" property="contentType"/>
+        <result column="byte_size" property="byteSize"/>
+        <result column="etag" property="etag"/>
+        <result column="metadata" property="metadata" typeHandler="com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler"/>
+        <result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/>
+        <result column="withdrawn_at" property="withdrawnAt"/>
+        <result column="purged_at" property="purgedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectByIdForUpdate" resultMap="fileVariantResultMap">
+        SELECT *
+        FROM file_variants
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <select id="selectByAssetIdForUpdate" resultMap="fileVariantResultMap">
+        SELECT *
+        FROM file_variants
+        WHERE asset_id = #{assetId}
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <update id="markReady">
+        UPDATE file_variants
+        SET object_key = #{objectKey},
+            content_type = #{contentType},
+            byte_size = #{byteSize},
+            etag = #{etag},
+            metadata = #{metadata,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
+            status = #{targetStatus},
+            failure_code = NULL,
+            failure_message = NULL,
+            updated_at = #{now}
+        WHERE id = #{variantId}
+            AND status = #{expectedStatus}
+    </update>
+
+    <update id="markFailed">
+        UPDATE file_variants
+        SET status = #{targetStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            updated_at = #{now}
+        WHERE id = #{variantId}
+            AND status = #{expectedStatus}
+    </update>
 </mapper>

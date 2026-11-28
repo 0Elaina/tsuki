@@ -32,8 +32,4 @@ public record StagingObjectKey(
     public static StagingObjectKey of(FileKind kind, LocalDate dateUtc, UUID uploadId) {
         return new StagingObjectKey(kind, dateUtc, uploadId);
     }
-
-    public static StagingObjectKey forImage(LocalDate dateUtc, UUID uploadId) {
-        return of(FileKind.IMAGE, dateUtc, uploadId);
-    }
 }

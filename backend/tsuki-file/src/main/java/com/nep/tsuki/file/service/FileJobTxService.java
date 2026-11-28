@@ -3,6 +3,7 @@ package com.nep.tsuki.file.service;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.nep.tsuki.file.config.FileJobsProperties;
 import com.nep.tsuki.file.constants.FileJobConstants;
 import com.nep.tsuki.file.mapper.FileAssetMapper;
@@ -21,8 +21,8 @@ import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.entity.FileVariant;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
+import com.nep.tsuki.file.model.enums.FileJobStatus;
 import com.nep.tsuki.file.model.enums.FileJobType;
-import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
 
 import lombok.RequiredArgsConstructor;
@@ -30,132 +30,121 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class FileJobTxService {
+    private static final int MAX_FAILURE_MESSAGE_LENGTH = 1000;
+
     private final FileJobMapper fileJobMapper;
     private final FileAssetMapper fileAssetMapper;
     private final FileVariantMapper fileVariantMapper;
     private final FileJobsProperties fileJobsProperties;
     private final TransactionTemplate transactionTemplate;
 
-    public record ClaimedFileJob(FileJob job, FileAsset asset) {
+    public record ClaimedFileJob(FileJob job, FileAsset asset, FileVariant variant) {
+    }
+
+    public enum CommitOutcome {
+        /** 事务成功提交 */
+        COMMITTED,
+        /** 目标状态已变化，本次运行任务已标为 CANCELLED */
+        CANCELLED,
+        /** 租约已失效或任务已被接管，本次放弃落库 */
+        LEASE_LOST
     }
 
     /**
-     * 在短事务中原子抢占指定类型的文件处理任务，并加载其关联的文件资产
-     *
-     * @param jobId        待执行的文件任务主键 ID
-     * @param expectedType 期望的任务类型，用于校验类型匹配并计算租约时长
-     * @return 抢占成功返回包含任务与资产的包装对象；若任务不存在、类型不符或状态不可抢占则返回 null
+     * 按 Asset -> Variant -> Job 锁序在短事务内原子抢占待执行任务
      */
-    public ClaimedFileJob claimForExecution(long jobId, FileJobType expectedType) {
-        Objects.requireNonNull(expectedType, "expectedType 不能为空");
-        return transactionTemplate.execute(status -> {
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            OffsetDateTime leaseUntil = now.plus(fileJobsProperties.getLeaseFor(expectedType));
+    public ClaimedFileJob claimForExecution(long jobId, Collection<FileJobType> allowedTypes) {
+        Objects.requireNonNull(allowedTypes, "allowedTypes 不能为空");
+        if (allowedTypes.isEmpty()) {
+            return null;
+        }
 
-            FileJob job = fileJobMapper.claimForExecution(
-                    jobId,
-                    expectedType.name(),
-                    now,
-                    leaseUntil);
-            if (job == null) {
+        List<String> allowedTypeNames = allowedTypes.stream().map(Enum::name).toList();
+        OffsetDateTime checkTime = OffsetDateTime.now(ZoneOffset.UTC);
+
+        // 先做无锁预检，快速跳过重复消息或未到可执行时间的任务
+        FileJob snapshot = fileJobMapper.selectById(jobId);
+        if (snapshot == null
+                || !FileJobStatus.PENDING.name().equals(snapshot.getStatus())
+                || !allowedTypeNames.contains(snapshot.getType())
+                || snapshot.getAvailableAt().isAfter(checkTime)) {
+            return null;
+        }
+
+        FileJobType jobType = FileJobType.findByName(snapshot.getType())
+                .orElseThrow(() -> new IllegalStateException("未知文件任务类型: " + snapshot.getType()));
+
+        return transactionTemplate.execute(status -> {
+            FileAsset asset = fileAssetMapper.selectByIdForUpdate(snapshot.getAssetId());
+            FileVariant variant = snapshot.getVariantId() != null
+                    ? fileVariantMapper.selectByIdForUpdate(snapshot.getVariantId())
+                    : null;
+
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime leaseUntil = now.plus(fileJobsProperties.getLeaseFor(jobType));
+
+            FileJob claimed = fileJobMapper.claimForExecution(jobId, allowedTypeNames, now, leaseUntil);
+            if (claimed == null) {
                 return null;
             }
-
-            FileAsset asset = fileAssetMapper.selectById(job.getAssetId());
-            return new ClaimedFileJob(job, asset);
+            return new ClaimedFileJob(claimed, asset, variant);
         });
     }
 
     /**
-     * 在短事务中完成文件任务：标记任务成功、批量落库交付规格，并在主任务场景下将资产切换为 READY
-     *
-     * @param job           当前执行中的文件任务
-     * @param asset         关联的文件资产
-     * @param originalKey   归档后的原始对象存储键（仅主任务推进资产状态时必填）
-     * @param archivedEtag  归档后的原始对象 ETag
-     * @param assetMetadata 探测到的原件扩展元数据（可为 null，仅主任务推进资产状态时写入）
-     * @param variants      本次处理生成的文件规格列表（仅归档原件时可传空列表）
-     * @return 事务成功提交返回 true；若任务租约已失效或状态不匹配则返回 false
+     * 短事务提交原件校验归档成功：按 Asset -> Job 锁序校验状态并推进资产为 READY（写入 24h 未绑定过期期限）
      */
-    public boolean completeSucceeded(
+    public CommitOutcome completeValidateUploadSucceeded(
             FileJob job,
-            FileAsset asset,
             String originalKey,
             String archivedEtag,
-            Map<String, Object> assetMetadata,
-            List<FileVariant> variants) {
+            Map<String, Object> assetMetadata) {
         Objects.requireNonNull(job, "job 不能为空");
-        Objects.requireNonNull(asset, "asset 不能为空");
-        Objects.requireNonNull(variants, "variants 不能为空");
+        if (!StringUtils.hasText(originalKey)) {
+            throw new IllegalArgumentException("originalKey 不能为空");
+        }
 
-        Boolean committed = transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(status -> {
+            FileAsset asset = fileAssetMapper.selectByIdForUpdate(job.getAssetId());
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-            int updatedJobRows = fileJobMapper.markJobSucceeded(
-                    job.getId(),
-                    job.getAttemptCount(),
-                    now);
-            if (updatedJobRows != 1) {
-                return Boolean.FALSE;
-            }
-
-            if (!variants.isEmpty()) {
-                for (FileVariant variant : variants) {
-                    if (variant.getAssetId() == null) {
-                        variant.setAssetId(asset.getId());
-                    }
-                    if (!StringUtils.hasText(variant.getStorageScope())) {
-                        variant.setStorageScope(FileStorageScope.PRIVATE.name());
-                    }
-                }
-                // 不能直接调用 MyBatis-Plus 的 insert(Collection)：同事务前序更新已绑定 SIMPLE 执行器
-                // MP 批量方法会切 BATCH 触发 ExecutorType 冲突
-                fileVariantMapper.insertBatch(variants, now);
-            }
-
-            boolean advancesAssetStatus = FileJobType
-                    .findByName(job.getType())
-                    .map(FileJobType::isAdvancesAssetStatus)
-                    .orElse(false);
-            if (advancesAssetStatus) {
-                if (!StringUtils.hasText(originalKey)) {
-                    throw new IllegalArgumentException("originalKey 不能为空");
-                }
-                // 通过 XML 显式绑定 PostgresJsonbTypeHandler，避免 LambdaUpdateWrapper 忽略实体 @TableField(typeHandler)
-                int updatedAssetRows = fileAssetMapper.markReady(
-                        asset.getId(),
-                        FileAssetStatus.UPLOAD_CONFIRMED.name(),
-                        FileAssetStatus.READY.name(),
-                        originalKey,
-                        archivedEtag,
-                        assetMetadata,
+            if (asset == null || !FileAssetStatus.UPLOAD_CONFIRMED.name().equals(asset.getStatus())) {
+                int cancelledRows = fileJobMapper.markRunningCancelled(
+                        job.getId(),
+                        job.getAttemptCount(),
+                        null,
+                        "资产状态已变化，取消本次归档提交",
                         now);
-                if (updatedAssetRows != 1) {
-                    throw new IllegalStateException("切换文件资产为 READY 失败: assetId=" + asset.getId());
-                }
+                return cancelledRows == 1 ? CommitOutcome.CANCELLED : CommitOutcome.LEASE_LOST;
             }
 
-            return Boolean.TRUE;
+            int updatedJobRows = fileJobMapper.markJobSucceeded(job.getId(), job.getAttemptCount(), now);
+            if (updatedJobRows != 1) {
+                return CommitOutcome.LEASE_LOST;
+            }
+
+            OffsetDateTime unboundExpiresAt = now.plus(FileJobConstants.UNBOUND_ASSET_TTL);
+            int updatedAssetRows = fileAssetMapper.markReady(
+                    asset.getId(),
+                    FileAssetStatus.UPLOAD_CONFIRMED.name(),
+                    FileAssetStatus.READY.name(),
+                    originalKey,
+                    archivedEtag,
+                    assetMetadata,
+                    unboundExpiresAt,
+                    now);
+            if (updatedAssetRows != 1) {
+                throw new IllegalStateException("切换文件资产为 READY 失败: assetId=" + asset.getId());
+            }
+            return CommitOutcome.COMMITTED;
         });
-        return Boolean.TRUE.equals(committed);
     }
 
-    private static final int MAX_FAILURE_MESSAGE_LENGTH = 1000;
-
     /**
-     * 在短事务中记录文件任务执行失败，按需重排等待重试或标记为终态失败
-     * 若任务进入终态失败且属于主任务，同步将关联的文件资产推进为 PROCESSING_FAILED
-     *
-     * @param job            当前执行中的文件任务
-     * @param asset          关联的文件资产
-     * @param failureCode    本次失败对应的业务错误码
-     * @param failureMessage 本次失败的补充详情（可为 null，超长自动截断）
-     * @param requeue        是否重新入队等待重试；false 表示直接标记为终态失败
-     * @return 事务成功更新任务状态返回 true；若任务租约已失效或状态不匹配则返回 false
+     * 短事务记录原件校验失败：支持重排重试，或按内容不合规/故障耗尽推进资产为 REJECTED / FAILED
      */
-    public boolean recordFailure(
+    public CommitOutcome recordValidateUploadFailure(
             FileJob job,
-            FileAsset asset,
             FileJobCode failureCode,
             String failureMessage,
             boolean requeue) {
@@ -163,15 +152,25 @@ public class FileJobTxService {
         Objects.requireNonNull(failureCode, "failureCode 不能为空");
         String normalizedFailureMessage = normalizeFailureMessage(failureMessage);
 
-        Boolean updated = transactionTemplate.execute(status -> {
+        return transactionTemplate.execute(status -> {
+            FileAsset asset = fileAssetMapper.selectByIdForUpdate(job.getAssetId());
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            if (asset != null && !FileAssetStatus.UPLOAD_CONFIRMED.name().equals(asset.getStatus())) {
+                int cancelledRows = fileJobMapper.markRunningCancelled(
+                        job.getId(),
+                        job.getAttemptCount(),
+                        null,
+                        "资产状态已变化，取消本次校验任务",
+                        now);
+                return cancelledRows == 1 ? CommitOutcome.CANCELLED : CommitOutcome.LEASE_LOST;
+            }
 
             if (requeue) {
                 Duration retryDelay = FileJobConstants
                         .retryDelayAfterAttempt(job.getAttemptCount())
-                        .orElseThrow(
-                                () -> new IllegalStateException("当前尝试次数不可重排: attemptCount=" + job.getAttemptCount()));
-
+                        .orElseThrow(() -> new IllegalStateException(
+                                "当前尝试次数不可重排: attemptCount=" + job.getAttemptCount()));
                 OffsetDateTime nextAvailableAt = now.plus(retryDelay);
                 int updatedRows = fileJobMapper.rescheduleRunningForRetry(
                         job.getId(),
@@ -180,7 +179,7 @@ public class FileJobTxService {
                         failureCode.code(),
                         normalizedFailureMessage,
                         now);
-                return updatedRows == 1;
+                return updatedRows == 1 ? CommitOutcome.COMMITTED : CommitOutcome.LEASE_LOST;
             }
 
             int updatedRows = fileJobMapper.markRunningFailed(
@@ -190,26 +189,49 @@ public class FileJobTxService {
                     normalizedFailureMessage,
                     now);
             if (updatedRows != 1) {
-                return Boolean.FALSE;
+                return CommitOutcome.LEASE_LOST;
             }
 
-            boolean advancesAssetStatus = FileJobType
-                    .findByName(job.getType())
-                    .map(FileJobType::isAdvancesAssetStatus)
-                    .orElse(false);
-            if (asset != null && advancesAssetStatus) {
-                fileAssetMapper.update(null, new LambdaUpdateWrapper<FileAsset>()
-                        .eq(FileAsset::getId, asset.getId())
-                        .eq(FileAsset::getStatus, FileAssetStatus.UPLOAD_CONFIRMED.name())
-                        .set(FileAsset::getStatus, FileAssetStatus.PROCESSING_FAILED.name())
-                        .set(FileAsset::getUpdatedAt, now));
+            if (asset != null) {
+                FileAssetStatus targetStatus = failureCode.contentRejected()
+                        ? FileAssetStatus.REJECTED
+                        : FileAssetStatus.FAILED;
+                fileAssetMapper.markValidationTerminalFailure(
+                        asset.getId(),
+                        FileAssetStatus.UPLOAD_CONFIRMED.name(),
+                        targetStatus.name(),
+                        failureCode.code(),
+                        normalizedFailureMessage,
+                        now);
             }
-            return Boolean.TRUE;
+            return CommitOutcome.COMMITTED;
         });
-        return Boolean.TRUE.equals(updated);
     }
 
-    private String normalizeFailureMessage(String failureMessage) {
+    /**
+     * 短事务取消仍在运行中的任务（目标记录已撤回或删除时调用）
+     */
+    public CommitOutcome cancelRunningJob(FileJob job, String failureCode, String reason) {
+        Objects.requireNonNull(job, "job 不能为空");
+        String normalizedReason = normalizeFailureMessage(reason);
+
+        return transactionTemplate.execute(status -> {
+            fileAssetMapper.selectByIdForUpdate(job.getAssetId());
+            if (job.getVariantId() != null) {
+                fileVariantMapper.selectByIdForUpdate(job.getVariantId());
+            }
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            int updatedRows = fileJobMapper.markRunningCancelled(
+                    job.getId(),
+                    job.getAttemptCount(),
+                    failureCode,
+                    normalizedReason,
+                    now);
+            return updatedRows == 1 ? CommitOutcome.CANCELLED : CommitOutcome.LEASE_LOST;
+        });
+    }
+
+    public static String normalizeFailureMessage(String failureMessage) {
         if (!StringUtils.hasText(failureMessage)) {
             return null;
         }

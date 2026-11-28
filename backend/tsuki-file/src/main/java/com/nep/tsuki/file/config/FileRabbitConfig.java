@@ -20,9 +20,6 @@ import com.nep.tsuki.file.constants.FileRabbitConstants;
 @EnableConfigurationProperties(FileJobsProperties.class)
 public class FileRabbitConfig {
 
-    /**
-     * 声明文件任务持久化直连交换机
-     */
     @Bean
     DirectExchange fileJobsExchange() {
         return ExchangeBuilder
@@ -31,40 +28,60 @@ public class FileRabbitConfig {
                 .build();
     }
 
-    /**
-     * 声明图片处理持久化队列
-     */
     @Bean
-    Queue fileImageProcessQueue() {
+    Queue fileInteractiveQueue() {
         return QueueBuilder
-                .durable(FileRabbitConstants.IMAGE_PROCESS_QUEUE)
+                .durable(FileRabbitConstants.INTERACTIVE_QUEUE)
                 .build();
     }
 
-    /**
-     * 将图片处理队列通过指定路由键绑定到文件任务交换机
-     */
     @Bean
-    Binding fileImageProcessBinding(Queue fileImageProcessQueue, DirectExchange fileJobsExchange) {
+    Binding fileInteractiveBinding(Queue fileInteractiveQueue, DirectExchange fileJobsExchange) {
         return BindingBuilder
-                .bind(fileImageProcessQueue)
+                .bind(fileInteractiveQueue)
                 .to(fileJobsExchange)
-                .with(FileRabbitConstants.IMAGE_PROCESS_ROUTING_KEY);
+                .with(FileRabbitConstants.INTERACTIVE_ROUTING_KEY);
     }
 
-    /**
-     * 配置图片处理专用监听容器工厂
-     */
-    @Bean(FileRabbitConstants.IMAGE_LISTENER_CONTAINER_FACTORY)
-    SimpleRabbitListenerContainerFactory fileImageListenerContainerFactory(
+    @Bean
+    Queue fileCleanupQueue() {
+        return QueueBuilder
+                .durable(FileRabbitConstants.CLEANUP_QUEUE)
+                .build();
+    }
+
+    @Bean
+    Binding fileCleanupBinding(Queue fileCleanupQueue, DirectExchange fileJobsExchange) {
+        return BindingBuilder
+                .bind(fileCleanupQueue)
+                .to(fileJobsExchange)
+                .with(FileRabbitConstants.CLEANUP_ROUTING_KEY);
+    }
+
+    @Bean(FileRabbitConstants.INTERACTIVE_LISTENER_CONTAINER_FACTORY)
+    SimpleRabbitListenerContainerFactory fileInteractiveListenerContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,
             ConnectionFactory connectionFactory,
             FileJobsProperties fileJobsProperties) {
+        return createContainerFactory(configurer, connectionFactory, fileJobsProperties.getInteractiveConcurrency());
+    }
+
+    @Bean(FileRabbitConstants.CLEANUP_LISTENER_CONTAINER_FACTORY)
+    SimpleRabbitListenerContainerFactory fileCleanupListenerContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            ConnectionFactory connectionFactory,
+            FileJobsProperties fileJobsProperties) {
+        return createContainerFactory(configurer, connectionFactory, fileJobsProperties.getCleanupConcurrency());
+    }
+
+    private SimpleRabbitListenerContainerFactory createContainerFactory(
+            SimpleRabbitListenerContainerFactoryConfigurer configurer,
+            ConnectionFactory connectionFactory,
+            int concurrency) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
         factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         factory.setPrefetchCount(1);
-        int concurrency = fileJobsProperties.getImageConcurrency();
         factory.setConcurrentConsumers(concurrency);
         factory.setMaxConcurrentConsumers(concurrency);
         return factory;

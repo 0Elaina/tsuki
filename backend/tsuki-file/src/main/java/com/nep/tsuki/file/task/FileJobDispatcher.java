@@ -3,7 +3,9 @@ package com.nep.tsuki.file.task;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -37,31 +39,37 @@ public class FileJobDispatcher {
     private final TransactionTemplate transactionTemplate;
     private final RabbitTemplate rabbitTemplate;
 
-    private static final List<String> SUPPORTED_TYPES = FileJobType.ALL_TYPE_NAMES;
-
-    private record PendingConfirm(Long jobId, CorrelationData correlationData) {
+    private record PendingConfirm(Long jobId, FileJobType jobType, CorrelationData correlationData) {
     }
 
     /**
-     * 定时轮询派发待处理任务
-     *
-     * 采用 {@code fixedDelay} 保证上一次排空积压后再开启下一轮计时，避免任务积压时线程重叠执行；
-     * 内部通过 while 循环持续拉取批次，直至积压清空或发生异常/超时才进入休眠
+     * 定时轮询派发待处理任务：每轮先派一批交互任务，再派一批清理任务，有积压时公平轮转，排空后延迟 1s 再扫描
      */
     @Scheduled(fixedDelay = 1000L)
     public void dispatchPendingJobs() {
-        while (dispatchSingleBatch()) {
+        boolean interactiveActive = !FileJobType.INTERACTIVE_TYPE_NAMES.isEmpty();
+        boolean cleanupActive = !FileJobType.CLEANUP_TYPE_NAMES.isEmpty();
+
+        while (interactiveActive || cleanupActive) {
+            if (Thread.currentThread().isInterrupted()) {
+                break;
+            }
+            if (interactiveActive) {
+                interactiveActive = dispatchSingleBatch(FileJobType.INTERACTIVE_TYPE_NAMES);
+            }
+            if (cleanupActive) {
+                cleanupActive = dispatchSingleBatch(FileJobType.CLEANUP_TYPE_NAMES);
+            }
         }
     }
 
     /**
-     * 派发单个批次的文件任务到 RabbitMQ（实现 Outbox 模式的可靠投递）
+     * 派发单个队列分组的一批文件任务到 RabbitMQ
      *
-     * @return true 表示本批次满载且全部正常投递，调用方可立即继续派发下一批；
-     *         false 表示无待处理任务、未满载或发生异常/超时，调用方应休眠等待下一轮调度
+     * @return true 表示本批次满载且正常投递，可继续轮转；false 表示无积压、未满载或发生异常/超时
      */
-    private boolean dispatchSingleBatch() {
-        if (SUPPORTED_TYPES.isEmpty()) {
+    private boolean dispatchSingleBatch(List<String> supportedTypes) {
+        if (supportedTypes.isEmpty()) {
             return false;
         }
 
@@ -70,7 +78,7 @@ public class FileJobDispatcher {
         OffsetDateTime claimUntil = now.plusSeconds(FileJobConstants.DISPATCH_CLAIM_DELAY_SECONDS);
 
         List<FileJob> claimedJobs = transactionTemplate.execute(status -> fileJobMapper.claimDispatchBatch(
-                SUPPORTED_TYPES,
+                supportedTypes,
                 now,
                 claimUntil,
                 batchToken,
@@ -99,9 +107,10 @@ public class FileJobDispatcher {
                                 properties.setMessageId(jobIdText);
                                 properties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                                 return message;
-                            }, correlationData);
+                            },
+                            correlationData);
 
-                    pendingConfirms.add(new PendingConfirm(job.getId(), correlationData));
+                    pendingConfirms.add(new PendingConfirm(job.getId(), jobType, correlationData));
                 }
                 return null;
             });
@@ -114,8 +123,7 @@ public class FileJobDispatcher {
             return false;
         }
 
-        CompletableFuture<?>[] futures = pendingConfirms
-                .stream()
+        CompletableFuture<?>[] futures = pendingConfirms.stream()
                 .map(pc -> pc.correlationData().getFuture())
                 .toArray(CompletableFuture[]::new);
         boolean confirmTimeout = false;
@@ -129,31 +137,37 @@ public class FileJobDispatcher {
             log.warn("批量文件任务派发确认超时, batchToken={}, sentCount={}", batchToken, pendingConfirms.size(), ex);
         }
 
-        List<Long> ackedJobIds = new ArrayList<>(pendingConfirms.size());
+        Map<FileJobType, List<Long>> ackedIdsByType = new EnumMap<>(FileJobType.class);
+        int ackedCount = 0;
         for (PendingConfirm pc : pendingConfirms) {
             CompletableFuture<CorrelationData.Confirm> future = pc.correlationData().getFuture();
             if (future.isDone() && !future.isCompletedExceptionally()) {
                 CorrelationData.Confirm confirm = future.getNow(null);
                 if (confirm != null && confirm.ack() && pc.correlationData().getReturned() == null) {
-                    ackedJobIds.add(pc.jobId());
+                    ackedIdsByType.computeIfAbsent(pc.jobType(), key -> new ArrayList<>()).add(pc.jobId());
+                    ackedCount++;
                 }
             }
         }
 
-        if (!ackedJobIds.isEmpty()) {
+        if (!ackedIdsByType.isEmpty()) {
             OffsetDateTime dispatchedAt = OffsetDateTime.now(ZoneOffset.UTC);
             try {
-                transactionTemplate.executeWithoutResult(
-                        status -> fileJobMapper.markDispatchedBatch(ackedJobIds, batchToken, dispatchedAt));
+                transactionTemplate.executeWithoutResult(status -> {
+                    for (Map.Entry<FileJobType, List<Long>> entry : ackedIdsByType.entrySet()) {
+                        OffsetDateTime redeliverAfter = dispatchedAt.plus(entry.getKey().getRedeliveryDelay());
+                        fileJobMapper.markDispatchedBatch(entry.getValue(), batchToken, dispatchedAt, redeliverAfter);
+                    }
+                });
             } catch (DataAccessException ex) {
-                log.error("回写文件任务投递状态失败, batchToken={}, ackedCount={}", batchToken, ackedJobIds.size(), ex);
+                log.error("回写文件任务投递确认状态失败, batchToken={}, ackedCount={}", batchToken, ackedCount, ex);
                 return false;
             }
         }
 
-        if (ackedJobIds.size() < claimedJobs.size()) {
-            log.warn("文件任务批次存在未确认或退回消息, batchToken={}, claimed={}, sent={}, acked={}", batchToken, claimedJobs.size(),
-                    pendingConfirms.size(), ackedJobIds.size());
+        if (ackedCount < claimedJobs.size()) {
+            log.warn("文件任务批次存在未确认或退回消息, batchToken={}, claimed={}, sent={}, acked={}",
+                    batchToken, claimedJobs.size(), pendingConfirms.size(), ackedCount);
         }
 
         return !sendFailed && !confirmTimeout && claimedJobs.size() == FileJobConstants.DISPATCH_BATCH_SIZE;

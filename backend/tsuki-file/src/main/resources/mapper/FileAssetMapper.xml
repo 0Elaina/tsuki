@@ -1,28 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.nep.tsuki.file.mapper.FileAssetMapper">
-    <!-- 批量删除过期的未确认记录 -->
-    <delete id="deleteExpiredUnconfirmedBatch">
-        DELETE FROM file_assets
-        WHERE id IN (
-            SELECT id
-            FROM file_assets
-            WHERE confirmed_at IS NULL
-                AND confirm_expires_at &lt;= #{cutoff}
-            ORDER BY confirm_expires_at, id
-            LIMIT #{batchSize}
-            FOR UPDATE SKIP LOCKED
-        )
-        AND confirmed_at IS NULL
-    </delete>
+    <resultMap id="fileAssetResultMap" type="com.nep.tsuki.file.model.entity.FileAsset">
+        <id column="id" property="id"/>
+        <result column="uploader_account_id" property="uploaderAccountId"/>
+        <result column="kind" property="kind"/>
+        <result column="status" property="status"/>
+        <result column="storage_scope" property="storageScope"/>
+        <result column="staging_key" property="stagingKey"/>
+        <result column="staging_etag" property="stagingEtag"/>
+        <result column="object_key" property="objectKey"/>
+        <result column="content_type" property="contentType"/>
+        <result column="byte_size" property="byteSize"/>
+        <result column="etag" property="etag"/>
+        <result column="original_filename" property="originalFilename"/>
+        <result column="metadata" property="metadata" typeHandler="com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler"/>
+        <result column="owner_type" property="ownerType"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="confirm_expires_at" property="confirmExpiresAt"/>
+        <result column="confirmed_at" property="confirmedAt"/>
+        <result column="bound_at" property="boundAt"/>
+        <result column="unbound_expires_at" property="unboundExpiresAt"/>
+        <result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/>
+        <result column="purged_at" property="purgedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
 
-    <!-- 归档完成时原子推进资产状态为 READY 并写入正式对象键、ETag 与 JSONB 扩展元数据 -->
+    <select id="selectByIdForUpdate" resultMap="fileAssetResultMap">
+        SELECT *
+        FROM file_assets
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <update id="markReady">
         UPDATE file_assets
         SET object_key = #{objectKey},
             etag = #{etag},
             metadata = #{metadata,jdbcType=OTHER,typeHandler=com.nep.tsuki.infra.persistence.mybatis.PostgresJsonbTypeHandler},
             status = #{targetStatus},
+            unbound_expires_at = #{unboundExpiresAt},
+            failure_code = NULL,
+            failure_message = NULL,
+            updated_at = #{now}
+        WHERE id = #{assetId}
+            AND status = #{expectedStatus}
+    </update>
+
+    <update id="markValidationTerminalFailure">
+        UPDATE file_assets
+        SET status = #{targetStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
             updated_at = #{now}
         WHERE id = #{assetId}
             AND status = #{expectedStatus}

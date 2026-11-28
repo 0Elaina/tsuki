@@ -26,8 +26,9 @@ public class S3Properties {
     private URI uploadEndpoint;
     @NotBlank(message = "S3 region 不能为空")
     private String region;
-    @NotBlank(message = "S3 bucket 不能为空")
-    private String bucket;
+    /** 私有存储桶名（存放 staging/、originals/ 与私有 variants/） */
+    @NotBlank(message = "S3 privateBucket 不能为空")
+    private String privateBucket;
     /** 公开交付存储桶名（可选，随首个需要公开交付的业务启用时配置） */
     private String deliveryBucket;
     /** 公开交付访问根地址（可选，可包含路径前缀，不可含凭据、查询参数和片段） */

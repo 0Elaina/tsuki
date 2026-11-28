@@ -185,40 +185,6 @@ public class S3FileObjectStorage implements FileObjectStorage {
     }
 
     @Override
-    public String archiveObject(String sourceKey, String sourceEtag, String targetKey, Path localFile,
-            String contentType, long byteSize) {
-        if (!StringUtils.hasText(sourceKey)) {
-            throw new IllegalArgumentException("sourceKey 不能为空");
-        }
-        if (!StringUtils.hasText(targetKey)) {
-            throw new IllegalArgumentException("targetKey 不能为空");
-        }
-        Objects.requireNonNull(localFile, "localFile 不能为空");
-        if (!StringUtils.hasText(contentType)) {
-            throw new IllegalArgumentException("contentType 不能为空");
-        }
-        if (byteSize <= 0L) {
-            throw new IllegalArgumentException("byteSize 必须大于 0");
-        }
-
-        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(resolveBucket(FileStorageScope.PRIVATE))
-                .key(targetKey)
-                .contentType(contentType)
-                .contentLength(byteSize)
-                .ifNoneMatch("*")
-                .build();
-        try {
-            PutObjectResponse response = s3Client.putObject(putObjectRequest, RequestBody.fromFile(localFile));
-            return response.eTag();
-        } catch (S3Exception ex) {
-            throw new IllegalStateException("写入文件对象失败 (HTTP " + ex.statusCode() + "): objectKey=" + targetKey, ex);
-        } catch (SdkException ex) {
-            throw new IllegalStateException("写入文件对象失败: objectKey=" + targetKey, ex);
-        }
-    }
-
-    @Override
     public String putObject(FileStorageScope scope, String objectKey, byte[] content, String contentType) {
         Objects.requireNonNull(scope, "scope 不能为空");
         if (!StringUtils.hasText(objectKey)) {
@@ -346,8 +312,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
         }
     }
 
-    @Override
-    public void deleteQuietlyInScope(FileStorageScope scope, Collection<String> objectKeys) {
+    private void deleteQuietlyInScope(FileStorageScope scope, Collection<String> objectKeys) {
         Objects.requireNonNull(scope, "scope 不能为空");
         if (objectKeys == null || objectKeys.isEmpty()) {
             return;
@@ -400,7 +365,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
 
     private String resolveBucket(FileStorageScope scope) {
         return switch (scope) {
-            case PRIVATE -> s3Properties.getBucket();
+            case PRIVATE -> s3Properties.getPrivateBucket().strip();
             case DELIVERY -> {
                 String deliveryBucket = s3Properties.getDeliveryBucket();
                 if (!StringUtils.hasText(deliveryBucket)) {

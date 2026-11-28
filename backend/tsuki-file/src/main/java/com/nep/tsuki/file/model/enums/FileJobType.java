@@ -1,5 +1,6 @@
 package com.nep.tsuki.file.model.enums;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -9,8 +10,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 
-import com.nep.tsuki.file.constants.FileRabbitConstants;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -19,26 +18,43 @@ import lombok.Getter;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public enum FileJobType {
 
-    /** 图片校验与原件归档任务 */
-    PROCESS_IMAGE(FileRabbitConstants.IMAGE_PROCESS_ROUTING_KEY, true);
+    /** 暂存原件校验、探测与归档 */
+    VALIDATE_UPLOAD(FileJobQueue.INTERACTIVE, Duration.ofSeconds(30L), false),
+    /** 按需生成文件衍生物 */
+    GENERATE_VARIANT(FileJobQueue.INTERACTIVE, Duration.ofSeconds(60L), true),
+    /** 物理清理整份资产及其未清理衍生物 */
+    CLEANUP_ASSET(FileJobQueue.CLEANUP, Duration.ofMinutes(5L), false),
+    /** 物理清理单个已撤回衍生物 */
+    CLEANUP_VARIANT(FileJobQueue.CLEANUP, Duration.ofMinutes(5L), true);
 
-    /** 对应的 RabbitMQ 路由键 */
-    private final String routingKey;
-    /** 该任务类型是否负责推进 file_assets 终态 */
-    private final boolean advancesAssetStatus;
+    /** 所属 RabbitMQ 队列 */
+    private final FileJobQueue queue;
+    /** Broker 确认后未领取的补派等待时长 */
+    private final Duration redeliveryDelay;
+    /** 是否必须关联 variant_id */
+    private final boolean requiresVariantId;
 
-    public static final List<String> ALL_TYPE_NAMES = Arrays.stream(values())
-            .map(FileJobType::name)
-            .toList();
+    public static final List<String> INTERACTIVE_TYPE_NAMES = typeNamesFor(FileJobQueue.INTERACTIVE);
+    public static final List<String> CLEANUP_TYPE_NAMES = typeNamesFor(FileJobQueue.CLEANUP);
 
-    /** 枚举名称到枚举实例的只读缓存映射 */
-    private static final Map<String, FileJobType> BY_NAME = Arrays
-            .stream(values())
+    private static final Map<String, FileJobType> BY_NAME = Arrays.stream(values())
             .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
 
-    /**
-     * 根据枚举名称安全查找对应的文件任务类型
-     */
+    public String getRoutingKey() {
+        return queue.getRoutingKey();
+    }
+
+    public boolean isCleanup() {
+        return queue == FileJobQueue.CLEANUP;
+    }
+
+    public static List<String> typeNamesFor(FileJobQueue queue) {
+        return Arrays.stream(values())
+                .filter(type -> type.queue == queue)
+                .map(Enum::name)
+                .toList();
+    }
+
     public static Optional<FileJobType> findByName(String type) {
         if (!StringUtils.hasText(type)) {
             return Optional.empty();

@@ -1,11 +1,16 @@
 package com.nep.tsuki.file.utils;
 
-import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+
+import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.file.constants.FileStorageConstants;
+import com.nep.tsuki.file.model.dto.StorageObjectRef;
+import com.nep.tsuki.file.model.entity.FileJob;
+import com.nep.tsuki.file.model.entity.FileVariant;
 import com.nep.tsuki.file.model.enums.FileJobType;
-import com.nep.tsuki.file.model.enums.ImageContentType;
+import com.nep.tsuki.file.model.enums.FileStorageScope;
 
 public final class FileObjectPathUtils {
     private FileObjectPathUtils() {
@@ -46,24 +51,31 @@ public final class FileObjectPathUtils {
     }
 
     /**
-     * 兼容调用入口（将在任务执行器升级后移除）
+     * 推导某次任务尝试可能写出的对象存储定位（用于租期超时回收或取消后的补偿清理）
      */
-    public static String imageOriginalKey(
-            long assetId,
-            long jobId,
-            int attemptCount,
-            ImageContentType contentType) {
-        Objects.requireNonNull(contentType, "contentType 不能为空");
-        return originalKey(assetId, jobId, attemptCount);
-    }
-
-    /**
-     * 根据任务类型获取单次执行尝试产生的候选对象键（用于租约超时回收清理）
-     */
-    public static List<String> attemptCandidateKeys(FileJobType jobType, long assetId, long jobId, int attemptCount) {
-        Objects.requireNonNull(jobType, "jobType 不能为空");
-        return switch (jobType) {
-            case PROCESS_IMAGE -> List.of(originalKey(assetId, jobId, attemptCount));
+    public static Optional<StorageObjectRef> attemptArtifact(FileJob job, FileVariant variant) {
+        Objects.requireNonNull(job, "job 不能为空");
+        if (job.getId() == null || job.getAssetId() == null
+                || job.getAttemptCount() == null || job.getAttemptCount() <= 0) {
+            return Optional.empty();
+        }
+        Optional<FileJobType> jobTypeOptional = FileJobType.findByName(job.getType());
+        if (jobTypeOptional.isEmpty()) {
+            return Optional.empty();
+        }
+        return switch (jobTypeOptional.get()) {
+            case VALIDATE_UPLOAD -> Optional.of(new StorageObjectRef(
+                    FileStorageScope.PRIVATE,
+                    originalKey(job.getAssetId(), job.getId(), job.getAttemptCount())));
+            case GENERATE_VARIANT -> {
+                if (job.getVariantId() == null || variant == null || !StringUtils.hasText(variant.getStorageScope())) {
+                    yield Optional.empty();
+                }
+                yield Optional.of(new StorageObjectRef(
+                        FileStorageScope.valueOf(variant.getStorageScope()),
+                        variantKey(job.getAssetId(), job.getVariantId(), job.getId(), job.getAttemptCount())));
+            }
+            case CLEANUP_ASSET, CLEANUP_VARIANT -> Optional.empty();
         };
     }
 

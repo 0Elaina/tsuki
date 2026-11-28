@@ -74,7 +74,7 @@ public class S3StagedUploadStorage implements StagedUploadStorage {
 
         // 构建 S3 上传请求，强制绑定长度与类型并禁止覆盖同名对象（ifNoneMatch="*"）
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(s3Properties.getBucket())
+                .bucket(s3Properties.getPrivateBucket())
                 .key(key.value())
                 .contentType(contentType.strip())
                 .contentLength(byteSize)
@@ -131,7 +131,7 @@ public class S3StagedUploadStorage implements StagedUploadStorage {
         }
 
         HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
-                .bucket(s3Properties.getBucket())
+                .bucket(s3Properties.getPrivateBucket())
                 .key(objectKey)
                 .build();
 

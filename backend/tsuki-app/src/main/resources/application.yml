@@ -29,7 +29,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 2
+        size: 4
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -71,7 +71,7 @@ tsuki:
     endpoint: "${TSUKI_S3_ENDPOINT:}"
     upload-endpoint: "${TSUKI_S3_UPLOAD_ENDPOINT:}"
     region: "${TSUKI_S3_REGION:us-east-1}"
-    bucket: "${TSUKI_S3_BUCKET:}"
+    private-bucket: "${TSUKI_S3_PRIVATE_BUCKET:}"
     delivery-bucket: "${TSUKI_S3_DELIVERY_BUCKET:}"
     delivery-base-url: "${TSUKI_S3_DELIVERY_BASE_URL:}"
     access-key: "${TSUKI_S3_ACCESS_KEY:}"
