@@ -58,4 +58,34 @@
         WHERE id = #{assetId}
             AND status = #{expectedStatus}
     </update>
+
+    <update id="expirePendingUploadsBatch">
+        UPDATE file_assets
+        SET status = 'EXPIRED',
+            updated_at = #{now}
+        WHERE id IN (
+            SELECT id
+            FROM file_assets
+            WHERE status = 'PENDING_UPLOAD'
+                AND confirmed_at IS NULL
+                AND confirm_expires_at &lt;= #{now}
+            ORDER BY confirm_expires_at, id
+            LIMIT #{batchSize}
+            FOR UPDATE SKIP LOCKED
+        )
+        AND status = 'PENDING_UPLOAD'
+        AND confirmed_at IS NULL
+        AND confirm_expires_at &lt;= #{now}
+    </update>
+
+    <select id="selectExpiredUnboundIds" resultType="java.lang.Long">
+        SELECT id
+        FROM file_assets
+        WHERE status = 'READY'
+            AND owner_type IS NULL
+            AND unbound_expires_at IS NOT NULL
+            AND unbound_expires_at &lt;= #{now}
+        ORDER BY unbound_expires_at, id
+        LIMIT #{batchSize}
+    </select>
 </mapper>

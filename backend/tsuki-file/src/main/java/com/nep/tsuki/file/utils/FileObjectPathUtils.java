@@ -1,19 +1,32 @@
 package com.nep.tsuki.file.utils;
 
+import java.time.LocalDate;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.UUID;
 
-import org.springframework.util.StringUtils;
-
+import com.nep.tsuki.common.constants.TimeConstants;
 import com.nep.tsuki.file.constants.FileStorageConstants;
-import com.nep.tsuki.file.model.dto.StorageObjectRef;
-import com.nep.tsuki.file.model.entity.FileJob;
-import com.nep.tsuki.file.model.entity.FileVariant;
-import com.nep.tsuki.file.model.enums.FileJobType;
-import com.nep.tsuki.file.model.enums.FileStorageScope;
+import com.nep.tsuki.file.model.enums.FileKind;
 
 public final class FileObjectPathUtils {
     private FileObjectPathUtils() {
+    }
+
+    /**
+     * 生成浏览器直传暂存区的对象键
+     * 格式: staging/{kind}/{UTC年}/{UTC月}/{UTC日}/{uuid}/source
+     */
+    public static String stagingKey(FileKind kind, LocalDate dateUtc, UUID uploadId) {
+        Objects.requireNonNull(kind, "kind 不能为空");
+        Objects.requireNonNull(dateUtc, "dateUtc 不能为空");
+        Objects.requireNonNull(uploadId, "uploadId 不能为空");
+        return String.join(
+                "/",
+                FileStorageConstants.STAGING_ROOT_PREFIX,
+                kind.getPathSegment(),
+                TimeConstants.DATE_SLASH.format(dateUtc),
+                uploadId.toString(),
+                FileStorageConstants.STAGING_SOURCE_FILENAME);
     }
 
     /**
@@ -48,35 +61,6 @@ public final class FileObjectPathUtils {
                 String.valueOf(jobId),
                 String.valueOf(attemptCount),
                 FileStorageConstants.VARIANT_OUTPUT_FILENAME);
-    }
-
-    /**
-     * 推导某次任务尝试可能写出的对象存储定位（用于租期超时回收或取消后的补偿清理）
-     */
-    public static Optional<StorageObjectRef> attemptArtifact(FileJob job, FileVariant variant) {
-        Objects.requireNonNull(job, "job 不能为空");
-        if (job.getId() == null || job.getAssetId() == null
-                || job.getAttemptCount() == null || job.getAttemptCount() <= 0) {
-            return Optional.empty();
-        }
-        Optional<FileJobType> jobTypeOptional = FileJobType.findByName(job.getType());
-        if (jobTypeOptional.isEmpty()) {
-            return Optional.empty();
-        }
-        return switch (jobTypeOptional.get()) {
-            case VALIDATE_UPLOAD -> Optional.of(new StorageObjectRef(
-                    FileStorageScope.PRIVATE,
-                    originalKey(job.getAssetId(), job.getId(), job.getAttemptCount())));
-            case GENERATE_VARIANT -> {
-                if (job.getVariantId() == null || variant == null || !StringUtils.hasText(variant.getStorageScope())) {
-                    yield Optional.empty();
-                }
-                yield Optional.of(new StorageObjectRef(
-                        FileStorageScope.valueOf(variant.getStorageScope()),
-                        variantKey(job.getAssetId(), job.getVariantId(), job.getId(), job.getAttemptCount())));
-            }
-            case CLEANUP_ASSET, CLEANUP_VARIANT -> Optional.empty();
-        };
     }
 
     private static void validatePositive(long value, String name) {

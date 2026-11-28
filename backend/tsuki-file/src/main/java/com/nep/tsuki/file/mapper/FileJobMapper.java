@@ -144,4 +144,9 @@ public interface FileJobMapper extends BaseMapper<FileJob> {
             @Param("variantId") long variantId,
             @Param("jobTypes") List<String> jobTypes,
             @Param("now") OffsetDateTime now);
+
+    /**
+     * 批量删除结束时间已满保留期限的历史任务流水
+     */
+    int purgeFinishedBatch(@Param("cutoff") OffsetDateTime cutoff, @Param("batchSize") int batchSize);
 }

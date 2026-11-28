@@ -4,26 +4,29 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.file.config.FileJobsProperties;
 import com.nep.tsuki.file.constants.FileJobConstants;
 import com.nep.tsuki.file.mapper.FileAssetMapper;
 import com.nep.tsuki.file.mapper.FileJobMapper;
 import com.nep.tsuki.file.mapper.FileVariantMapper;
-import com.nep.tsuki.file.model.dto.StorageObjectRef;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.entity.FileVariant;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
 import com.nep.tsuki.file.model.enums.FileJobStatus;
 import com.nep.tsuki.file.model.enums.FileJobType;
+import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.model.enums.FileVariantStatus;
 import com.nep.tsuki.file.processing.FileJobCode;
 import com.nep.tsuki.file.storage.FileObjectStorage;
@@ -50,7 +53,8 @@ public class FileJobReaper implements SchedulingConfigurer {
             FileJobType jobType,
             int attemptCount,
             FileJobStatus targetStatus,
-            StorageObjectRef artifactToDelete) {
+            FileStorageScope artifactScope,
+            String artifactKey) {
     }
 
     @Override
@@ -79,22 +83,20 @@ public class FileJobReaper implements SchedulingConfigurer {
             return false;
         }
 
-        List<StorageObjectRef> artifactsToDelete = new ArrayList<>();
+        Map<FileStorageScope, List<String>> artifactsByScope = new EnumMap<>(FileStorageScope.class);
         for (Long jobId : candidateJobIds) {
             ReapedJobOutcome outcome = reapSingleJob(jobId);
             if (outcome == null) {
                 continue;
             }
             logReapedJob(outcome);
-            if (outcome.artifactToDelete() != null) {
-                artifactsToDelete.add(outcome.artifactToDelete());
+            if (outcome.artifactScope() != null && StringUtils.hasText(outcome.artifactKey())) {
+                artifactsByScope.computeIfAbsent(outcome.artifactScope(), key -> new ArrayList<>())
+                        .add(outcome.artifactKey());
             }
         }
 
-        if (!artifactsToDelete.isEmpty()) {
-            fileObjectStorage.deleteQuietly(artifactsToDelete);
-        }
-
+        artifactsByScope.forEach(fileObjectStorage::deleteQuietly);
         return candidateJobIds.size() == FileJobConstants.REAP_BATCH_SIZE;
     }
 
@@ -132,12 +134,13 @@ public class FileJobReaper implements SchedulingConfigurer {
                         now);
                 return updated == 1
                         ? new ReapedJobOutcome(job.getId(), job.getAssetId(), job.getVariantId(), null,
-                                job.getAttemptCount(), FileJobStatus.FAILED, null)
+                                job.getAttemptCount(), FileJobStatus.FAILED, null, null)
                         : null;
             }
 
             FileJobType jobType = jobTypeOptional.get();
-            StorageObjectRef artifact = FileObjectPathUtils.attemptArtifact(job, variant).orElse(null);
+            FileStorageScope artifactScope = resolveArtifactScope(jobType, variant);
+            String artifactKey = resolveArtifactKey(jobType, job);
 
             if (shouldCancelExpiredJob(jobType, asset, variant)) {
                 int updated = fileJobMapper.markExpiredCancelled(
@@ -148,7 +151,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                         now);
                 return updated == 1
                         ? new ReapedJobOutcome(job.getId(), job.getAssetId(), job.getVariantId(), jobType,
-                                job.getAttemptCount(), FileJobStatus.CANCELLED, artifact)
+                                job.getAttemptCount(), FileJobStatus.CANCELLED, artifactScope, artifactKey)
                         : null;
             }
 
@@ -164,7 +167,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                         now);
                 return updated == 1
                         ? new ReapedJobOutcome(job.getId(), job.getAssetId(), job.getVariantId(), jobType,
-                                job.getAttemptCount(), FileJobStatus.PENDING, null)
+                                job.getAttemptCount(), FileJobStatus.PENDING, null, null)
                         : null;
             }
 
@@ -180,7 +183,7 @@ public class FileJobReaper implements SchedulingConfigurer {
                         now);
                 return updated == 1
                         ? new ReapedJobOutcome(job.getId(), job.getAssetId(), job.getVariantId(), jobType,
-                                job.getAttemptCount(), FileJobStatus.PENDING, artifact)
+                                job.getAttemptCount(), FileJobStatus.PENDING, artifactScope, artifactKey)
                         : null;
             }
 
@@ -196,8 +199,32 @@ public class FileJobReaper implements SchedulingConfigurer {
 
             advanceTerminalFailureTarget(jobType, asset, variant, now);
             return new ReapedJobOutcome(job.getId(), job.getAssetId(), job.getVariantId(), jobType,
-                    job.getAttemptCount(), FileJobStatus.FAILED, artifact);
+                    job.getAttemptCount(), FileJobStatus.FAILED, artifactScope, artifactKey);
         });
+    }
+
+    private FileStorageScope resolveArtifactScope(FileJobType jobType, FileVariant variant) {
+        return switch (jobType) {
+            case VALIDATE_UPLOAD -> FileStorageScope.PRIVATE;
+            case GENERATE_VARIANT -> (variant != null && StringUtils.hasText(variant.getStorageScope()))
+                    ? FileStorageScope.valueOf(variant.getStorageScope())
+                    : null;
+            case CLEANUP_ASSET, CLEANUP_VARIANT -> null;
+        };
+    }
+
+    private String resolveArtifactKey(FileJobType jobType, FileJob job) {
+        if (job.getAttemptCount() == null || job.getAttemptCount() <= 0) {
+            return null;
+        }
+        return switch (jobType) {
+            case VALIDATE_UPLOAD -> FileObjectPathUtils.originalKey(job.getAssetId(), job.getId(), job.getAttemptCount());
+            case GENERATE_VARIANT -> job.getVariantId() != null
+                    ? FileObjectPathUtils.variantKey(job.getAssetId(), job.getVariantId(), job.getId(),
+                            job.getAttemptCount())
+                    : null;
+            case CLEANUP_ASSET, CLEANUP_VARIANT -> null;
+        };
     }
 
     private boolean shouldCancelExpiredJob(FileJobType jobType, FileAsset asset, FileVariant variant) {

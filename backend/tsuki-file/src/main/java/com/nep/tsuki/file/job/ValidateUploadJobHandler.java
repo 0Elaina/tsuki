@@ -3,9 +3,9 @@ package com.nep.tsuki.file.job;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.amqp.ImmediateRequeueAmqpException;
 import org.springframework.dao.DataAccessException;
@@ -13,8 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 import com.nep.tsuki.file.constants.FileJobConstants;
-import com.nep.tsuki.file.model.dto.ObjectCopyOutcome;
-import com.nep.tsuki.file.model.dto.StorageObjectRef;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
@@ -45,8 +43,8 @@ public class ValidateUploadJobHandler implements FileJobHandler {
     private final ImageProcessor imageProcessor;
 
     @Override
-    public FileJobType supportedType() {
-        return FileJobType.VALIDATE_UPLOAD;
+    public Set<FileJobType> supportedTypes() {
+        return Set.of(FileJobType.VALIDATE_UPLOAD);
     }
 
     @Override
@@ -55,7 +53,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
         FileAsset asset = claimed.asset();
         if (asset == null) {
             log.error("校验任务关联的文件资产不存在: jobId={}, assetId={}", job.getId(), job.getAssetId());
-            handleFailure(job, FileJobCode.SOURCE_MISSING, "关联的文件资产不存在: assetId=" + job.getAssetId(), List.of());
+            handleFailure(job, FileJobCode.SOURCE_MISSING, "关联的文件资产不存在: assetId=" + job.getAssetId(), null);
             return;
         }
         if (!FileAssetStatus.UPLOAD_CONFIRMED.name().equals(asset.getStatus())) {
@@ -69,12 +67,12 @@ public class ValidateUploadJobHandler implements FileJobHandler {
         try {
             kind = FileKind.valueOf(asset.getKind());
         } catch (IllegalArgumentException ex) {
-            handleFailure(job, FileJobCode.INVALID_IMAGE, "不支持的文件类型: " + asset.getKind(), List.of());
+            handleFailure(job, FileJobCode.INVALID_IMAGE, "不支持的文件类型: " + asset.getKind(), null);
             return;
         }
 
         Path tempFile = null;
-        List<StorageObjectRef> attemptArtifacts = new ArrayList<>(1);
+        String archivedKey = null;
         try {
             tempFile = Files.createTempFile("tsuki-file-validate-", ".tmp");
 
@@ -89,14 +87,14 @@ public class ValidateUploadJobHandler implements FileJobHandler {
             } catch (IllegalStateException ex) {
                 log.warn("下载暂存原件失败: jobId={}, assetId={}, stagingKey={}",
                         job.getId(), asset.getId(), asset.getStagingKey(), ex);
-                handleFailure(job, FileJobCode.STORAGE_ERROR, "下载暂存原件失败: " + ex.getMessage(), attemptArtifacts);
+                handleFailure(job, FileJobCode.STORAGE_ERROR, "下载暂存原件失败: " + ex.getMessage(), null);
                 return;
             }
 
             if (!downloadCode.isSuccess()) {
                 log.warn("暂存原件条件读取校验未通过: jobId={}, assetId={}, code={}",
                         job.getId(), asset.getId(), downloadCode.code());
-                handleFailure(job, downloadCode, "暂存原件下载校验未通过: " + downloadCode.code(), attemptArtifacts);
+                handleFailure(job, downloadCode, "暂存原件下载校验未通过: " + downloadCode.code(), null);
                 return;
             }
 
@@ -104,39 +102,37 @@ public class ValidateUploadJobHandler implements FileJobHandler {
             if (!probeResult.isSuccess()) {
                 log.warn("原件内容校验未通过: jobId={}, assetId={}, code={}",
                         job.getId(), asset.getId(), probeResult.code().code());
-                handleFailure(job, probeResult.code(), "原件内容校验未通过: " + probeResult.code().code(), attemptArtifacts);
+                handleFailure(job, probeResult.code(), "原件内容校验未通过: " + probeResult.code().code(), null);
                 return;
             }
 
-            String originalKey = FileObjectPathUtils.originalKey(asset.getId(), job.getId(), job.getAttemptCount());
-            attemptArtifacts.add(new StorageObjectRef(FileStorageScope.PRIVATE, originalKey));
-
-            ObjectCopyOutcome copyOutcome;
+            archivedKey = FileObjectPathUtils.originalKey(asset.getId(), job.getId(), job.getAttemptCount());
+            FileProcessResult<String> copyResult;
             try {
-                copyOutcome = fileObjectStorage.copyObjectIfMatch(
+                copyResult = fileObjectStorage.copyObjectIfMatch(
                         FileStorageScope.PRIVATE,
                         asset.getStagingKey(),
                         asset.getStagingEtag(),
                         FileStorageScope.PRIVATE,
-                        originalKey);
+                        archivedKey);
             } catch (IllegalStateException ex) {
                 log.warn("CopyObject 归档原件失败: jobId={}, assetId={}, attemptCount={}",
                         job.getId(), asset.getId(), job.getAttemptCount(), ex);
-                handleFailure(job, FileJobCode.STORAGE_ERROR, "归档原件失败: " + ex.getMessage(), attemptArtifacts);
+                handleFailure(job, FileJobCode.STORAGE_ERROR, "归档原件失败: " + ex.getMessage(), archivedKey);
                 return;
             }
 
-            if (!copyOutcome.isSuccess()) {
+            if (!copyResult.isSuccess()) {
                 log.warn("CopyObject 源对象条件不满足，结束校验: jobId={}, assetId={}, code={}",
-                        job.getId(), asset.getId(), copyOutcome.code().code());
-                handleFailure(job, copyOutcome.code(), "归档时源对象已变化或缺失: " + copyOutcome.code().code(), attemptArtifacts);
+                        job.getId(), asset.getId(), copyResult.code().code());
+                handleFailure(job, copyResult.code(), "归档时源对象已变化或缺失: " + copyResult.code().code(), archivedKey);
                 return;
             }
 
-            commitSuccess(job, asset, originalKey, copyOutcome.eTag(), probeResult.data(), attemptArtifacts);
+            commitSuccess(job, asset, archivedKey, copyResult.data(), probeResult.data());
         } catch (IOException ex) {
             log.warn("创建原件校验本地临时文件失败: jobId={}, assetId={}", job.getId(), asset.getId(), ex);
-            handleFailure(job, FileJobCode.STORAGE_ERROR, "创建本地临时文件失败: " + ex.getMessage(), attemptArtifacts);
+            handleFailure(job, FileJobCode.STORAGE_ERROR, "创建本地临时文件失败: " + ex.getMessage(), archivedKey);
         } finally {
             deleteTempFileQuietly(tempFile);
         }
@@ -153,8 +149,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
             FileAsset asset,
             String originalKey,
             String archivedEtag,
-            Map<String, Object> assetMetadata,
-            List<StorageObjectRef> attemptArtifacts) {
+            Map<String, Object> assetMetadata) {
         try {
             CommitOutcome outcome = fileJobTxService.completeValidateUploadSucceeded(
                     job,
@@ -167,12 +162,12 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 case CANCELLED -> {
                     log.warn("原件校验提交时资产已变化，任务已取消并清理本次归档产物: jobId={}, assetId={}, attemptCount={}",
                             job.getId(), asset.getId(), job.getAttemptCount());
-                    fileObjectStorage.deleteQuietly(attemptArtifacts);
+                    fileObjectStorage.deleteQuietly(FileStorageScope.PRIVATE, List.of(originalKey));
                 }
                 case LEASE_LOST -> {
                     log.warn("原件校验提交时租期已失效，放弃落库并清理本次归档产物: jobId={}, assetId={}, attemptCount={}",
                             job.getId(), asset.getId(), job.getAttemptCount());
-                    fileObjectStorage.deleteQuietly(attemptArtifacts);
+                    fileObjectStorage.deleteQuietly(FileStorageScope.PRIVATE, List.of(originalKey));
                 }
             }
         } catch (DataAccessException | TransactionException ex) {
@@ -188,7 +183,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
             FileJob job,
             FileJobCode failureCode,
             String failureMessage,
-            List<StorageObjectRef> attemptArtifacts) {
+            String archivedKey) {
         boolean requeue = failureCode.retryable()
                 && FileJobConstants.retryDelayAfterAttempt(job.getAttemptCount()).isPresent();
 
@@ -202,12 +197,12 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 log.warn("原件校验任务未成功: jobId={}, assetId={}, attemptCount={}, failureCode={}, requeue={}, outcome={}",
                         job.getId(), job.getAssetId(), job.getAttemptCount(), failureCode.code(), requeue, outcome);
             }
-            if (!attemptArtifacts.isEmpty()) {
-                fileObjectStorage.deleteQuietly(attemptArtifacts);
+            if (archivedKey != null) {
+                fileObjectStorage.deleteQuietly(FileStorageScope.PRIVATE, List.of(archivedKey));
             }
         } catch (DataAccessException | TransactionException ex) {
-            if (!attemptArtifacts.isEmpty()) {
-                fileObjectStorage.deleteQuietly(attemptArtifacts);
+            if (archivedKey != null) {
+                fileObjectStorage.deleteQuietly(FileStorageScope.PRIVATE, List.of(archivedKey));
             }
             log.error("记录原件校验失败状态时数据库异常，退避 1 秒后重投: jobId={}, failureCode={}",
                     job.getId(), failureCode.code(), ex);

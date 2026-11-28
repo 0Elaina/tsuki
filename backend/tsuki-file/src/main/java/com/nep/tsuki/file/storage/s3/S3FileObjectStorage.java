@@ -9,21 +9,15 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 
-import com.nep.tsuki.file.model.dto.ObjectCopyOutcome;
-import com.nep.tsuki.file.model.dto.PresignedDownload;
-import com.nep.tsuki.file.model.dto.StorageObjectRef;
 import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
+import com.nep.tsuki.file.processing.FileProcessResult;
 import com.nep.tsuki.file.storage.FileObjectStorage;
 import com.nep.tsuki.infra.storage.s3.S3Properties;
 
@@ -137,7 +131,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
     }
 
     @Override
-    public ObjectCopyOutcome copyObjectIfMatch(
+    public FileProcessResult<String> copyObjectIfMatch(
             FileStorageScope sourceScope,
             String sourceKey,
             String sourceEtag,
@@ -167,13 +161,16 @@ public class S3FileObjectStorage implements FileObjectStorage {
             CopyObjectResponse response = s3Client.copyObject(builder.build());
             CopyObjectResult result = response.copyObjectResult();
             String targetEtag = result != null ? result.eTag() : null;
-            return ObjectCopyOutcome.success(targetEtag);
+            if (!StringUtils.hasText(targetEtag)) {
+                throw new IllegalStateException("CopyObject 响应缺少目标 ETag: targetKey=" + targetKey);
+            }
+            return FileProcessResult.success(targetEtag);
         } catch (NoSuchKeyException ex) {
-            return ObjectCopyOutcome.failure(FileJobCode.SOURCE_MISSING);
+            return FileProcessResult.failure(FileJobCode.SOURCE_MISSING);
         } catch (S3Exception ex) {
             return switch (ex.statusCode()) {
-                case 404 -> ObjectCopyOutcome.failure(FileJobCode.SOURCE_MISSING);
-                case 412 -> ObjectCopyOutcome.failure(FileJobCode.SOURCE_CHANGED);
+                case 404 -> FileProcessResult.failure(FileJobCode.SOURCE_MISSING);
+                case 412 -> FileProcessResult.failure(FileJobCode.SOURCE_CHANGED);
                 default -> throw new IllegalStateException(
                         "复制归档对象失败 (HTTP " + ex.statusCode() + "): sourceKey=" + sourceKey + ", targetKey=" + targetKey,
                         ex);
@@ -218,7 +215,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
     }
 
     @Override
-    public PresignedDownload presignGet(FileStorageScope scope, String objectKey, Duration ttl) {
+    public URI presignGet(FileStorageScope scope, String objectKey, Duration ttl) {
         Objects.requireNonNull(scope, "scope 不能为空");
         if (!StringUtils.hasText(objectKey)) {
             throw new IllegalArgumentException("objectKey 不能为空");
@@ -246,51 +243,48 @@ public class S3FileObjectStorage implements FileObjectStorage {
         }
 
         try {
-            URI uri = presigned.url().toURI();
-            return new PresignedDownload(uri, presigned.expiration());
+            return presigned.url().toURI();
         } catch (URISyntaxException ex) {
             throw new IllegalStateException("预签名 GET URL 转换 URI 失败", ex);
         }
     }
 
     @Override
-    public void deleteObjects(Collection<StorageObjectRef> objects) {
-        if (objects == null || objects.isEmpty()) {
+    public void deleteObjects(FileStorageScope scope, Collection<String> objectKeys) {
+        Objects.requireNonNull(scope, "scope 不能为空");
+        List<String> validKeys = sanitizeKeys(objectKeys);
+        if (validKeys.isEmpty()) {
             return;
         }
 
-        Map<FileStorageScope, List<String>> keysByScope = groupKeysByScope(objects);
+        String bucket = resolveBucket(scope);
         List<String> failures = new ArrayList<>();
 
-        for (Map.Entry<FileStorageScope, List<String>> entry : keysByScope.entrySet()) {
-            String bucket = resolveBucket(entry.getKey());
-            List<String> keys = entry.getValue();
-            for (int start = 0; start < keys.size(); start += DELETE_BATCH_SIZE) {
-                int end = Math.min(start + DELETE_BATCH_SIZE, keys.size());
-                List<ObjectIdentifier> identifiers = keys.subList(start, end)
-                        .stream()
-                        .map(key -> ObjectIdentifier.builder().key(key).build())
-                        .toList();
-                DeleteObjectsRequest request = DeleteObjectsRequest.builder()
-                        .bucket(bucket)
-                        .delete(Delete.builder().objects(identifiers).quiet(true).build())
-                        .build();
+        for (int start = 0; start < validKeys.size(); start += DELETE_BATCH_SIZE) {
+            int end = Math.min(start + DELETE_BATCH_SIZE, validKeys.size());
+            List<ObjectIdentifier> identifiers = validKeys.subList(start, end)
+                    .stream()
+                    .map(key -> ObjectIdentifier.builder().key(key).build())
+                    .toList();
+            DeleteObjectsRequest request = DeleteObjectsRequest.builder()
+                    .bucket(bucket)
+                    .delete(Delete.builder().objects(identifiers).quiet(true).build())
+                    .build();
 
-                DeleteObjectsResponse response;
-                try {
-                    response = s3Client.deleteObjects(request);
-                } catch (SdkException ex) {
-                    throw new IllegalStateException(
-                            "批量删除对象失败: bucket=" + bucket + ", keyCount=" + identifiers.size(), ex);
-                }
+            DeleteObjectsResponse response;
+            try {
+                response = s3Client.deleteObjects(request);
+            } catch (SdkException ex) {
+                throw new IllegalStateException(
+                        "批量删除对象失败: bucket=" + bucket + ", keyCount=" + identifiers.size(), ex);
+            }
 
-                if (response.hasErrors()) {
-                    for (S3Error error : response.errors()) {
-                        if (ERROR_CODE_NO_SUCH_KEY.equals(error.code())) {
-                            continue;
-                        }
-                        failures.add(bucket + "/" + error.key() + "(" + error.code() + ": " + error.message() + ")");
+            if (response.hasErrors()) {
+                for (S3Error error : response.errors()) {
+                    if (ERROR_CODE_NO_SUCH_KEY.equals(error.code())) {
+                        continue;
                     }
+                    failures.add(bucket + "/" + error.key() + "(" + error.code() + ": " + error.message() + ")");
                 }
             }
         }
@@ -302,27 +296,9 @@ public class S3FileObjectStorage implements FileObjectStorage {
     }
 
     @Override
-    public void deleteQuietly(Collection<StorageObjectRef> objects) {
-        if (objects == null || objects.isEmpty()) {
-            return;
-        }
-        Map<FileStorageScope, List<String>> keysByScope = groupKeysByScope(objects);
-        for (Map.Entry<FileStorageScope, List<String>> entry : keysByScope.entrySet()) {
-            deleteQuietlyInScope(entry.getKey(), entry.getValue());
-        }
-    }
-
-    private void deleteQuietlyInScope(FileStorageScope scope, Collection<String> objectKeys) {
+    public void deleteQuietly(FileStorageScope scope, Collection<String> objectKeys) {
         Objects.requireNonNull(scope, "scope 不能为空");
-        if (objectKeys == null || objectKeys.isEmpty()) {
-            return;
-        }
-
-        List<String> validKeys = objectKeys.stream()
-                .filter(StringUtils::hasText)
-                .map(String::strip)
-                .distinct()
-                .toList();
+        List<String> validKeys = sanitizeKeys(objectKeys);
         if (validKeys.isEmpty()) {
             return;
         }
@@ -376,20 +352,14 @@ public class S3FileObjectStorage implements FileObjectStorage {
         };
     }
 
-    private Map<FileStorageScope, List<String>> groupKeysByScope(Collection<StorageObjectRef> objects) {
-        Map<FileStorageScope, Set<String>> deduped = new EnumMap<>(FileStorageScope.class);
-        for (StorageObjectRef ref : objects) {
-            if (ref == null) {
-                continue;
-            }
-            deduped.computeIfAbsent(ref.scope(), key -> new LinkedHashSet<>()).add(ref.objectKey());
+    private List<String> sanitizeKeys(Collection<String> objectKeys) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
+            return List.of();
         }
-        Map<FileStorageScope, List<String>> grouped = new EnumMap<>(FileStorageScope.class);
-        deduped.forEach((scope, keys) -> {
-            if (!keys.isEmpty()) {
-                grouped.put(scope, new ArrayList<>(keys));
-            }
-        });
-        return grouped;
+        return objectKeys.stream()
+                .filter(StringUtils::hasText)
+                .map(String::strip)
+                .distinct()
+                .toList();
     }
 }

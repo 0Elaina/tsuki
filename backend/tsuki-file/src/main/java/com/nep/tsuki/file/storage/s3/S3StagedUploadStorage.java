@@ -12,9 +12,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.file.config.FileUploadProperties;
+import com.nep.tsuki.file.constants.FileStorageConstants;
 import com.nep.tsuki.file.model.dto.PresignedUpload;
 import com.nep.tsuki.file.model.dto.StagedObjectMetadata;
-import com.nep.tsuki.file.model.dto.StagingObjectKey;
 import com.nep.tsuki.file.storage.StagedUploadStorage;
 import com.nep.tsuki.infra.storage.s3.S3Properties;
 
@@ -60,8 +60,11 @@ public class S3StagedUploadStorage implements StagedUploadStorage {
      * @return 预签名上传凭证（包含上传地址、过期时间及必需请求头）
      */
     @Override
-    public PresignedUpload presignPut(StagingObjectKey key, String contentType, long byteSize, long maxBytes) {
-        Objects.requireNonNull(key, "key 不能为空");
+    public PresignedUpload presignPut(String stagingObjectKey, String contentType, long byteSize, long maxBytes) {
+        if (!StringUtils.hasText(stagingObjectKey)
+                || !stagingObjectKey.startsWith(FileStorageConstants.STAGING_ROOT_PREFIX + "/")) {
+            throw new IllegalArgumentException("非法的暂存对象键: " + stagingObjectKey);
+        }
         if (!StringUtils.hasText(contentType)) {
             throw new IllegalArgumentException("contentType 不能为空");
         }
@@ -75,7 +78,7 @@ public class S3StagedUploadStorage implements StagedUploadStorage {
         // 构建 S3 上传请求，强制绑定长度与类型并禁止覆盖同名对象（ifNoneMatch="*"）
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(s3Properties.getPrivateBucket())
-                .key(key.value())
+                .key(stagingObjectKey)
                 .contentType(contentType.strip())
                 .contentLength(byteSize)
                 .ifNoneMatch("*")

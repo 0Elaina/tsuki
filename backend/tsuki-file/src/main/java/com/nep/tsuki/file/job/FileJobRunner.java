@@ -1,5 +1,6 @@
 package com.nep.tsuki.file.job;
 
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +11,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
-import com.nep.tsuki.file.model.enums.FileJobQueue;
 import com.nep.tsuki.file.model.enums.FileJobType;
 import com.nep.tsuki.file.service.FileJobTxService;
 import com.nep.tsuki.file.service.FileJobTxService.ClaimedFileJob;
@@ -18,7 +18,7 @@ import com.nep.tsuki.file.service.FileJobTxService.ClaimedFileJob;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 文件任务统一执行调度器：负责按队列领取执行租约并分派给对应的 {@link FileJobHandler}
+ * 文件任务统一执行调度器：负责按队列允许的任务类型领取执行租约并分派给对应的 {@link FileJobHandler}
  */
 @Slf4j
 @Component
@@ -27,37 +27,32 @@ public class FileJobRunner {
 
     private final FileJobTxService fileJobTxService;
     private final Map<FileJobType, FileJobHandler> handlersByType;
-    private final Map<FileJobQueue, List<FileJobType>> registeredTypesByQueue;
 
     public FileJobRunner(FileJobTxService fileJobTxService, List<FileJobHandler> handlers) {
         this.fileJobTxService = Objects.requireNonNull(fileJobTxService, "fileJobTxService 不能为空");
         Map<FileJobType, FileJobHandler> handlerMap = new EnumMap<>(FileJobType.class);
         for (FileJobHandler handler : handlers) {
-            FileJobType type = Objects.requireNonNull(handler.supportedType(), "supportedType 不能为空");
-            if (handlerMap.put(type, handler) != null) {
-                throw new IllegalStateException("重复注册文件任务处理器: " + type);
+            Collection<FileJobType> types = Objects.requireNonNull(handler.supportedTypes(), "supportedTypes 不能为空");
+            for (FileJobType type : types) {
+                Objects.requireNonNull(type, "FileJobType 不能为空");
+                if (handlerMap.put(type, handler) != null) {
+                    throw new IllegalStateException("重复注册文件任务处理器: " + type);
+                }
             }
         }
         this.handlersByType = Map.copyOf(handlerMap);
-
-        Map<FileJobQueue, List<FileJobType>> queueMap = new EnumMap<>(FileJobQueue.class);
-        for (FileJobQueue queue : FileJobQueue.values()) {
-            List<FileJobType> types = handlerMap.keySet().stream()
-                    .filter(type -> type.getQueue() == queue)
-                    .toList();
-            queueMap.put(queue, types);
-        }
-        this.registeredTypesByQueue = Map.copyOf(queueMap);
     }
 
     /**
-     * 领取并执行指定队列下投递的任务
+     * 领取并执行允许类型集合内的任务
      */
-    public void run(long jobId, FileJobQueue queue) {
-        Objects.requireNonNull(queue, "queue 不能为空");
-        List<FileJobType> allowedTypes = registeredTypesByQueue.getOrDefault(queue, List.of());
+    public void run(long jobId, Collection<FileJobType> queueTypes) {
+        Objects.requireNonNull(queueTypes, "queueTypes 不能为空");
+        List<FileJobType> allowedTypes = queueTypes.stream()
+                .filter(handlersByType::containsKey)
+                .toList();
         if (allowedTypes.isEmpty()) {
-            log.warn("当前队列未注册任何任务处理器，忽略消息: queue={}, jobId={}", queue, jobId);
+            log.warn("当前队列未注册任何任务处理器，忽略消息: jobId={}, queueTypes={}", jobId, queueTypes);
             return;
         }
 
@@ -65,13 +60,13 @@ public class FileJobRunner {
         try {
             claimed = fileJobTxService.claimForExecution(jobId, allowedTypes);
         } catch (DataAccessException | TransactionException ex) {
-            log.error("领取文件任务时数据库访问异常，退避 1 秒后重投: queue={}, jobId={}", queue, jobId, ex);
+            log.error("领取文件任务时数据库访问异常，退避 1 秒后重投: jobId={}", jobId, ex);
             waitBeforeImmediateRequeue();
             throw new ImmediateRequeueAmqpException("领取文件任务时数据库访问异常: jobId=" + jobId, ex);
         }
 
         if (claimed == null) {
-            log.debug("未领到文件任务执行资格，跳过重复消息: queue={}, jobId={}", queue, jobId);
+            log.debug("未领到文件任务执行资格，跳过重复消息: jobId={}", jobId);
             return;
         }
 

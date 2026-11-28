@@ -271,4 +271,17 @@
             #{item}
         </foreach>
     </update>
+
+    <delete id="purgeFinishedBatch">
+        DELETE FROM file_jobs
+        WHERE id IN (
+            SELECT id
+            FROM file_jobs
+            WHERE finished_at IS NOT NULL
+                AND finished_at &lt;= #{cutoff}
+            ORDER BY finished_at, id
+            LIMIT #{batchSize}
+            FOR UPDATE SKIP LOCKED
+        )
+    </delete>
 </mapper>

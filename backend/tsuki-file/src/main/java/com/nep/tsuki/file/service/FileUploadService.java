@@ -28,7 +28,6 @@ import com.nep.tsuki.file.mapper.FileJobMapper;
 import com.nep.tsuki.file.model.dto.IssuedFileUpload;
 import com.nep.tsuki.file.model.dto.PresignedUpload;
 import com.nep.tsuki.file.model.dto.StagedObjectMetadata;
-import com.nep.tsuki.file.model.dto.StagingObjectKey;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
@@ -38,6 +37,7 @@ import com.nep.tsuki.file.model.enums.FileKind;
 import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.model.enums.ImageContentType;
 import com.nep.tsuki.file.storage.StagedUploadStorage;
+import com.nep.tsuki.file.utils.FileObjectPathUtils;
 import com.nep.tsuki.file.utils.FileUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -98,7 +98,7 @@ public class FileUploadService {
 
         consumeSignQuota(uploaderAccountId, accountType);
 
-        StagingObjectKey stagingObjectKey = StagingObjectKey.of(kind, LocalDate.now(ZoneOffset.UTC), UUID.randomUUID());
+        String stagingObjectKey = FileObjectPathUtils.stagingKey(kind, LocalDate.now(ZoneOffset.UTC), UUID.randomUUID());
         PresignedUpload upload = stagedUploadStorage.presignPut(
                 stagingObjectKey,
                 normalizedContentType,
@@ -115,7 +115,7 @@ public class FileUploadService {
         fileAsset.setKind(kind.name());
         fileAsset.setStatus(FileAssetStatus.PENDING_UPLOAD.name());
         fileAsset.setStorageScope(FileStorageScope.PRIVATE.name());
-        fileAsset.setStagingKey(stagingObjectKey.value());
+        fileAsset.setStagingKey(stagingObjectKey);
         fileAsset.setContentType(normalizedContentType);
         fileAsset.setByteSize(byteSize);
         fileAsset.setOriginalFilename(normalizedFilename);

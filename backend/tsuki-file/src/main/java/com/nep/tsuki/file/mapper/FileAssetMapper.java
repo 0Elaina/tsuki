@@ -1,6 +1,7 @@
 package com.nep.tsuki.file.mapper;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -40,4 +41,14 @@ public interface FileAssetMapper extends BaseMapper<FileAsset> {
             @Param("failureCode") String failureCode,
             @Param("failureMessage") String failureMessage,
             @Param("now") OffsetDateTime now);
+
+    /**
+     * 批量将超过确认期限且仍为 PENDING_UPLOAD 的记录置为 EXPIRED（保留元数据）
+     */
+    int expirePendingUploadsBatch(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
+
+    /**
+     * 查询已到期且尚未绑定业务记录的 READY 资产主键列表
+     */
+    List<Long> selectExpiredUnboundIds(@Param("now") OffsetDateTime now, @Param("batchSize") int batchSize);
 }

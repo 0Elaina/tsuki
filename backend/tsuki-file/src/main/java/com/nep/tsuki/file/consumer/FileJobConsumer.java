@@ -10,7 +10,7 @@ import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.file.constants.FileRabbitConstants;
 import com.nep.tsuki.file.job.FileJobRunner;
-import com.nep.tsuki.file.model.enums.FileJobQueue;
+import com.nep.tsuki.file.model.enums.FileJobType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,7 +27,7 @@ public class FileJobConsumer {
             containerFactory = FileRabbitConstants.INTERACTIVE_LISTENER_CONTAINER_FACTORY)
     public void onInteractiveJobMessage(Message message) {
         long jobId = parseJobId(message);
-        fileJobRunner.run(jobId, FileJobQueue.INTERACTIVE);
+        fileJobRunner.run(jobId, FileJobType.INTERACTIVE_TYPES);
     }
 
     @RabbitListener(
@@ -35,7 +35,7 @@ public class FileJobConsumer {
             containerFactory = FileRabbitConstants.CLEANUP_LISTENER_CONTAINER_FACTORY)
     public void onCleanupJobMessage(Message message) {
         long jobId = parseJobId(message);
-        fileJobRunner.run(jobId, FileJobQueue.CLEANUP);
+        fileJobRunner.run(jobId, FileJobType.CLEANUP_TYPES);
     }
 
     private long parseJobId(Message message) {
