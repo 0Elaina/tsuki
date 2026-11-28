@@ -1,4 +1,4 @@
-package com.nep.tsuki.file.job;
+package com.nep.tsuki.file.job.handler;
 
 import com.nep.tsuki.file.model.enums.FileJobType;
 import com.nep.tsuki.file.service.FileJobTxService.ClaimedFileJob;

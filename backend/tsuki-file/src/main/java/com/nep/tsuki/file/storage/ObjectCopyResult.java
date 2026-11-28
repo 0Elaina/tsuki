@@ -1,4 +1,4 @@
-package com.nep.tsuki.file.model.dto;
+package com.nep.tsuki.file.storage;
 
 import java.util.Objects;
 

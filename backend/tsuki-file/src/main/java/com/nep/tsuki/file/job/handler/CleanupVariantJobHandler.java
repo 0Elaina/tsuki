@@ -1,4 +1,4 @@
-package com.nep.tsuki.file.job;
+package com.nep.tsuki.file.job.handler;
 
 import java.util.List;
 
@@ -9,6 +9,7 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.util.StringUtils;
 
 import com.nep.tsuki.file.constants.FileJobConstants;
+import com.nep.tsuki.file.job.FileJobRunner;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.entity.FileVariant;
 import com.nep.tsuki.file.model.enums.FileJobType;

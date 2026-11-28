@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 
-import com.nep.tsuki.file.model.dto.ObjectCopyResult;
 import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
 

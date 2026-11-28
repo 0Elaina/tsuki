@@ -10,6 +10,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
+import com.nep.tsuki.file.job.handler.FileJobHandler;
 import com.nep.tsuki.file.model.enums.FileJobQueue;
 import com.nep.tsuki.file.model.enums.FileJobType;
 import com.nep.tsuki.file.service.FileJobTxService;

@@ -1,4 +1,4 @@
-package com.nep.tsuki.file.job;
+package com.nep.tsuki.file.job.handler;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.nep.tsuki.file.constants.FileJobConstants;
+import com.nep.tsuki.file.job.FileJobRunner;
 import com.nep.tsuki.file.mapper.FileVariantMapper;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;

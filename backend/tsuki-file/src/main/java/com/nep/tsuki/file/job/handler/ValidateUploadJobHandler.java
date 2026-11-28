@@ -1,4 +1,4 @@
-package com.nep.tsuki.file.job;
+package com.nep.tsuki.file.job.handler;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 import com.nep.tsuki.file.constants.FileJobConstants;
-import com.nep.tsuki.file.model.dto.ObjectCopyResult;
+import com.nep.tsuki.file.job.FileJobRunner;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
@@ -26,6 +26,7 @@ import com.nep.tsuki.file.service.FileJobTxService;
 import com.nep.tsuki.file.service.FileJobTxService.ClaimedFileJob;
 import com.nep.tsuki.file.service.FileJobTxService.CommitOutcome;
 import com.nep.tsuki.file.storage.FileObjectStorage;
+import com.nep.tsuki.file.storage.ObjectCopyResult;
 import com.nep.tsuki.file.utils.FileObjectPathUtils;
 
 import lombok.RequiredArgsConstructor;

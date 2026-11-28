@@ -15,10 +15,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 
-import com.nep.tsuki.file.model.dto.ObjectCopyResult;
 import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
 import com.nep.tsuki.file.storage.FileObjectStorage;
+import com.nep.tsuki.file.storage.ObjectCopyResult;
 import com.nep.tsuki.infra.storage.s3.S3Properties;
 
 import lombok.extern.slf4j.Slf4j;
