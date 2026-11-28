@@ -8,13 +8,21 @@ import com.nep.tsuki.common.constants.TimeConstants;
 import com.nep.tsuki.file.constants.FileStorageConstants;
 import com.nep.tsuki.file.model.enums.FileKind;
 
+/**
+ * 文件对象存储路径规范工具，集中维护暂存区、已校验原件与衍生物产物的 S3 对象键规则
+ */
 public final class FileObjectPathUtils {
     private FileObjectPathUtils() {
     }
 
     /**
      * 生成浏览器直传暂存区的对象键
-     * 格式: staging/{kind}/{UTC年}/{UTC月}/{UTC日}/{uuid}/source
+     * 格式: {@code staging/{kind}/{UTC年}/{UTC月}/{UTC日}/{uuid}/source}
+     *
+     * @param kind     文件类型
+     * @param dateUtc  UTC 日期分区
+     * @param uploadId 随机上传标识 UUID
+     * @return 暂存区完整对象键
      */
     public static String stagingKey(FileKind kind, LocalDate dateUtc, UUID uploadId) {
         Objects.requireNonNull(kind, "kind 不能为空");
@@ -31,7 +39,12 @@ public final class FileObjectPathUtils {
 
     /**
      * 生成已校验私有原件的尝试级对象键
-     * 格式: originals/{assetId}/{jobId}/{attempt}/source
+     * 格式: {@code originals/{assetId}/{jobId}/{attempt}/source}
+     *
+     * @param assetId      文件资产主键 ID
+     * @param jobId        校验归档任务主键 ID
+     * @param attemptCount 本次任务尝试次数
+     * @return 私有原件完整对象键
      */
     public static String originalKey(long assetId, long jobId, int attemptCount) {
         validatePositive(assetId, "assetId");
@@ -47,7 +60,13 @@ public final class FileObjectPathUtils {
 
     /**
      * 生成衍生物产物的尝试级对象键
-     * 格式: variants/{assetId}/{variantId}/{jobId}/{attempt}/output
+     * 格式: {@code variants/{assetId}/{variantId}/{jobId}/{attempt}/output}
+     *
+     * @param assetId      文件资产主键 ID
+     * @param variantId    文件衍生物主键 ID
+     * @param jobId        衍生物生成任务主键 ID
+     * @param attemptCount 本次任务尝试次数
+     * @return 衍生物产物完整对象键
      */
     public static String variantKey(long assetId, long variantId, long jobId, int attemptCount) {
         validatePositive(assetId, "assetId");

@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.springframework.amqp.ImmediateRequeueAmqpException;
 import org.springframework.dao.DataAccessException;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 
 import com.nep.tsuki.file.constants.FileJobConstants;
+import com.nep.tsuki.file.model.dto.ObjectCopyResult;
 import com.nep.tsuki.file.model.entity.FileAsset;
 import com.nep.tsuki.file.model.entity.FileJob;
 import com.nep.tsuki.file.model.enums.FileAssetStatus;
@@ -32,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 暂存原件校验与归档任务处理器：按暂存 ETag 条件下载校验，通过后用 CopyObject 归档至 originals/
+ * 暂存原件校验与归档任务处理器：按暂存 ETag 条件下载并校验内容，通过后通过 S3 CopyObject 归档至 originals/
  */
 @Slf4j
 @Component
@@ -43,14 +43,16 @@ public class ValidateUploadJobHandler implements FileJobHandler {
     private final ImageProcessor imageProcessor;
 
     @Override
-    public Set<FileJobType> supportedTypes() {
-        return Set.of(FileJobType.VALIDATE_UPLOAD);
+    public FileJobType supportedType() {
+        return FileJobType.VALIDATE_UPLOAD;
     }
 
     @Override
     public void handle(ClaimedFileJob claimed) {
         FileJob job = claimed.job();
         FileAsset asset = claimed.asset();
+
+        // 核验关联资产存在且仍处于待校验状态，资产已被撤回或删除时直接取消任务
         if (asset == null) {
             log.error("校验任务关联的文件资产不存在: jobId={}, assetId={}", job.getId(), job.getAssetId());
             handleFailure(job, FileJobCode.SOURCE_MISSING, "关联的文件资产不存在: assetId=" + job.getAssetId(), null);
@@ -76,6 +78,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
         try {
             tempFile = Files.createTempFile("tsuki-file-validate-", ".tmp");
 
+            // 1. 按暂存 ETag 条件流式下载到本地临时文件，核对精确字节数
             FileJobCode downloadCode;
             try {
                 downloadCode = fileObjectStorage.downloadToFile(
@@ -98,6 +101,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 return;
             }
 
+            // 2. 校验二进制内容合规性并探测原件扩展元数据
             FileProcessResult<Map<String, Object>> probeResult = validateAndProbe(kind, tempFile, asset.getContentType());
             if (!probeResult.isSuccess()) {
                 log.warn("原件内容校验未通过: jobId={}, assetId={}, code={}",
@@ -106,8 +110,9 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 return;
             }
 
+            // 3. 在发起 CopyObject 前先记录尝试级目标键，确保任何异常分支都能幂等回收残留对象
             archivedKey = FileObjectPathUtils.originalKey(asset.getId(), job.getId(), job.getAttemptCount());
-            FileProcessResult<String> copyResult;
+            ObjectCopyResult copyResult;
             try {
                 copyResult = fileObjectStorage.copyObjectIfMatch(
                         FileStorageScope.PRIVATE,
@@ -129,7 +134,8 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 return;
             }
 
-            commitSuccess(job, asset, archivedKey, copyResult.data(), probeResult.data());
+            // 4. 短事务提交归档结果与探测元数据，将资产推进为 READY
+            commitSuccess(job, asset, archivedKey, copyResult.eTag(), probeResult.data());
         } catch (IOException ex) {
             log.warn("创建原件校验本地临时文件失败: jobId={}, assetId={}", job.getId(), asset.getId(), ex);
             handleFailure(job, FileJobCode.STORAGE_ERROR, "创建本地临时文件失败: " + ex.getMessage(), archivedKey);
@@ -171,7 +177,7 @@ public class ValidateUploadJobHandler implements FileJobHandler {
                 }
             }
         } catch (DataAccessException | TransactionException ex) {
-            // 提交结果不明时先保留产物，待租约回收确认结果后再处理
+            // 数据库提交结果不明时禁止主动删对象，保留归档产物待租期回收确认结果后再处理
             log.error("提交原件校验结果时发生数据库异常，保留归档产物并退避 1 秒后重投: jobId={}, assetId={}, originalKey={}",
                     job.getId(), asset.getId(), originalKey, ex);
             FileJobRunner.waitBeforeImmediateRequeue();

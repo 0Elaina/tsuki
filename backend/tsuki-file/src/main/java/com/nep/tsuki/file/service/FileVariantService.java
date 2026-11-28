@@ -32,6 +32,9 @@ import com.nep.tsuki.file.model.enums.ImageVariantPreset;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 文件衍生物管理服务，负责按注册规格申请衍生物、显式重试失败记录、撤回停发及解析交付地址
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,6 +48,9 @@ public class FileVariantService {
 
     /**
      * 按主键查询衍生物记录
+     *
+     * @param variantId 衍生物主键 ID
+     * @return 文件衍生物实体
      */
     public FileVariant getVariant(long variantId) {
         validatePositive(variantId, "variantId");
@@ -56,7 +62,10 @@ public class FileVariantService {
     }
 
     /**
-     * 业务完成鉴权后解析已就绪衍生物的访问地址（撤回或资产删除立即停止签发）
+     * 业务完成鉴权后解析已就绪衍生物的访问地址（衍生物撤回或资产删除立即停止签发）
+     *
+     * @param variantId 衍生物主键 ID
+     * @return 私有预签名 GET 地址或公开交付地址
      */
     public URI resolveVariantUrl(long variantId) {
         FileVariant variant = getVariant(variantId);
@@ -72,7 +81,12 @@ public class FileVariantService {
     }
 
     /**
-     * 按规格编码最新版本申请衍生物（要求资产已就绪且已绑定）
+     * 按规格编码当前已注册的最新版本申请衍生物（要求资产已就绪且已绑定业务记录）
+     *
+     * @param assetId      文件资产主键 ID
+     * @param code         规格编码（如 FULL）
+     * @param storageScope 目标逻辑存储范围（PRIVATE / DELIVERY）
+     * @return 既有未撤回衍生物或新创建的 PENDING 衍生物实体
      */
     @Transactional
     public FileVariant requestVariant(long assetId, String code, FileStorageScope storageScope) {
@@ -90,6 +104,12 @@ public class FileVariantService {
 
     /**
      * 按资产 ID、规格编码、预设版本与存储范围申请衍生物：未撤回记录存在时幂等返回既有记录，撤回后重新申请生成新记录
+     *
+     * @param assetId        文件资产主键 ID
+     * @param code           规格编码
+     * @param presetRevision 规格预设修订版本号
+     * @param storageScope   目标逻辑存储范围（PRIVATE / DELIVERY）
+     * @return 既有未撤回衍生物或新创建的 PENDING 衍生物实体
      */
     @Transactional
     public FileVariant requestVariant(long assetId, String code, int presetRevision, FileStorageScope storageScope) {
@@ -102,9 +122,10 @@ public class FileVariantService {
         }
         Objects.requireNonNull(storageScope, "storageScope 不能为空");
 
+        // 申请公开衍生物前先校验交付桶已配置，避免入队后持续失败
         fileAccessService.ensureScopeWritable(storageScope);
 
-        // 锁定父资产行，保证同一资产下的衍生物申请串行并严格遵循 Asset -> Variant -> Job 锁序
+        // 锁定父资产行，串行化同一资产的衍生物申请并严格遵循 Asset -> Variant -> Job 锁序
         FileAsset asset = fileAssetMapper.selectByIdForUpdate(assetId);
         if (asset == null) {
             throw new BusinessException(FileApiCode.FILE_ASSET_NOT_FOUND);
@@ -119,6 +140,7 @@ public class FileVariantService {
         String normalizedCode = code.strip();
         validatePresetRegistered(FileKind.valueOf(asset.getKind()), normalizedCode, presetRevision);
 
+        // 命中未撤回记录时直接幂等返回（PENDING / READY / FAILED 均返回既有记录）
         FileVariant existing = fileVariantMapper.selectOne(new LambdaQueryWrapper<FileVariant>()
                 .eq(FileVariant::getAssetId, assetId)
                 .eq(FileVariant::getCode, normalizedCode)
@@ -145,7 +167,10 @@ public class FileVariantService {
     }
 
     /**
-     * 显式重试失败的衍生物：复用原 variantId，重置为 PENDING 并重新入队 GENERATE_VARIANT
+     * 显式重试失败的衍生物：复用原 variantId，重置为 PENDING 并重新登记 GENERATE_VARIANT 任务
+     *
+     * @param variantId 失败状态的衍生物主键 ID
+     * @return 重置为 PENDING 后的衍生物实体
      */
     @Transactional
     public FileVariant retryVariant(long variantId) {
@@ -155,6 +180,7 @@ public class FileVariantService {
             throw new BusinessException(FileApiCode.FILE_VARIANT_NOT_FOUND);
         }
 
+        // 遵循 Asset -> Variant -> Job 锁序，校验父资产仍就绪且目标衍生物处于 FAILED
         FileAsset asset = fileAssetMapper.selectByIdForUpdate(snapshot.getAssetId());
         FileVariant variant = fileVariantMapper.selectByIdForUpdate(variantId);
         if (asset == null || !FileAssetStatus.READY.name().equals(asset.getStatus())) {
@@ -189,7 +215,9 @@ public class FileVariantService {
     }
 
     /**
-     * 撤回衍生物：同事务立即停发、取消未领取生成任务并登记 CLEANUP_VARIANT（幂等）
+     * 撤回衍生物：同事务立即停发、取消未领取的生成任务并登记 CLEANUP_VARIANT（幂等）
+     *
+     * @param variantId 待撤回的衍生物主键 ID
      */
     @Transactional
     public void withdrawVariant(long variantId) {
@@ -199,6 +227,7 @@ public class FileVariantService {
             throw new BusinessException(FileApiCode.FILE_VARIANT_NOT_FOUND);
         }
 
+        // 遵循 Asset -> Variant -> Job 锁序
         fileAssetMapper.selectByIdForUpdate(snapshot.getAssetId());
         FileVariant variant = fileVariantMapper.selectByIdForUpdate(variantId);
         if (variant == null) {
@@ -216,6 +245,7 @@ public class FileVariantService {
                 .set(FileVariant::getWithdrawnAt, now)
                 .set(FileVariant::getUpdatedAt, now));
 
+        // 取消尚未领取的生成任务；正在运行的生成任务将在提交或租期回收时标为 CANCELLED 并清理尝试产物
         fileJobMapper.cancelPendingByVariant(variantId, GENERATE_VARIANT_TYPES, now);
 
         FileJob cleanupJob = new FileJob();

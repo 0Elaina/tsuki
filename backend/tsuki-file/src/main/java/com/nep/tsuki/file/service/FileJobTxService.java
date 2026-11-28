@@ -29,6 +29,9 @@ import com.nep.tsuki.file.processing.FileJobCode;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * 文件异步任务短事务协调服务，所有跨表写事务严格按 Asset -> Variant -> Job 顺序加锁以避免死锁
+ */
 @Service
 @RequiredArgsConstructor
 public class FileJobTxService {
@@ -40,20 +43,34 @@ public class FileJobTxService {
     private final FileJobsProperties fileJobsProperties;
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * 任务抢占结果上下文
+     *
+     * @param job     已进入 RUNNING 的任务记录
+     * @param asset   关联的文件资产记录
+     * @param variant 关联的衍生物记录（非衍生物任务为 {@code null}）
+     */
     public record ClaimedFileJob(FileJob job, FileAsset asset, FileVariant variant) {
     }
 
+    /**
+     * 任务短事务提交结果
+     */
     public enum CommitOutcome {
-        /** 事务成功提交 */
+        /** 事务成功落库 */
         COMMITTED,
-        /** 目标状态已变化，本次运行任务已标为 CANCELLED */
+        /** 关联资产或衍生物状态已变化，本次运行任务已标为 CANCELLED */
         CANCELLED,
-        /** 租约已失效或任务已被接管，本次放弃落库 */
+        /** 执行租约已失效或任务已被接管，本次放弃落库 */
         LEASE_LOST
     }
 
     /**
-     * 按 Asset -> Variant -> Job 锁序在短事务内原子抢占待执行任务
+     * 在短事务内按 Asset -> Variant -> Job 锁序原子抢占指定类型的待执行任务
+     *
+     * @param jobId        待执行任务主键 ID
+     * @param allowedTypes 当前消费队列允许领取的任务类型集合
+     * @return 抢占成功返回上下文；若任务不存在、类型不符、状态不可抢占或未到执行时间则返回 {@code null}
      */
     public ClaimedFileJob claimForExecution(long jobId, Collection<FileJobType> allowedTypes) {
         Objects.requireNonNull(allowedTypes, "allowedTypes 不能为空");
@@ -64,6 +81,7 @@ public class FileJobTxService {
         List<String> allowedTypeNames = allowedTypes.stream().map(Enum::name).toList();
         OffsetDateTime checkTime = OffsetDateTime.now(ZoneOffset.UTC);
 
+        // 先做无锁预检，快速过滤重复消息、不匹配类型与尚未到点的延迟重试任务
         FileJob snapshot = fileJobMapper.selectById(jobId);
         if (snapshot == null
                 || !FileJobStatus.PENDING.name().equals(snapshot.getStatus())
@@ -76,6 +94,7 @@ public class FileJobTxService {
                 .orElseThrow(() -> new IllegalStateException("未知文件任务类型: " + snapshot.getType()));
 
         return transactionTemplate.execute(status -> {
+            // 严格按 Asset -> Variant -> Job 锁序加行锁，与业务绑定/撤回事务保持一致
             FileAsset asset = fileAssetMapper.selectByIdForUpdate(snapshot.getAssetId());
             FileVariant variant = snapshot.getVariantId() != null
                     ? fileVariantMapper.selectByIdForUpdate(snapshot.getVariantId())
@@ -93,7 +112,13 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务提交原件校验归档成功：按 Asset -> Job 锁序校验状态并推进资产为 READY（写入 24h 未绑定过期期限）
+     * 在短事务内提交原件校验与归档成功结果，将资产推进为 READY 并写入 24 小时未绑定过期截止时间
+     *
+     * @param job           当前运行中的校验任务
+     * @param originalKey   归档后的正式原件对象键
+     * @param archivedEtag  归档后的正式原件 ETag
+     * @param assetMetadata 探测得到的原件扩展元数据
+     * @return 提交结果状态
      */
     public CommitOutcome completeValidateUploadSucceeded(
             FileJob job,
@@ -109,6 +134,7 @@ public class FileJobTxService {
             FileAsset asset = fileAssetMapper.selectByIdForUpdate(job.getAssetId());
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
+            // 资产在校验期间被删除或状态变化时，将本次运行任务标为 CANCELLED，由调用方回收归档产物
             if (asset == null || !FileAssetStatus.UPLOAD_CONFIRMED.name().equals(asset.getStatus())) {
                 int cancelledRows = fileJobMapper.markRunningCancelled(
                         job.getId(),
@@ -142,7 +168,13 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务记录原件校验失败：支持重排重试，或按内容不合规/故障耗尽推进资产为 REJECTED / FAILED
+     * 在短事务内记录原件校验失败结果：按需重排等待重试，或在终态失败时将资产推进为 REJECTED 或 FAILED
+     *
+     * @param job            当前运行中的校验任务
+     * @param failureCode    失败原因码
+     * @param failureMessage 失败补充详情（超长自动截断）
+     * @param requeue        是否重排等待重试；{@code false} 表示进入终态失败
+     * @return 提交结果状态
      */
     public CommitOutcome recordValidateUploadFailure(
             FileJob job,
@@ -193,10 +225,9 @@ public class FileJobTxService {
                 return CommitOutcome.LEASE_LOST;
             }
 
+            // 内容不合规进入 REJECTED，存储缺失或重试耗尽进入 FAILED
             if (asset != null) {
-                FileAssetStatus targetStatus = failureCode.contentRejected()
-                        ? FileAssetStatus.REJECTED
-                        : FileAssetStatus.FAILED;
+                FileAssetStatus targetStatus = resolveValidateTerminalAssetStatus(failureCode);
                 fileAssetMapper.markValidationTerminalFailure(
                         asset.getId(),
                         FileAssetStatus.UPLOAD_CONFIRMED.name(),
@@ -210,7 +241,15 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务提交衍生物生成成功：按 Asset -> Variant -> Job 锁序校验状态并推进衍生物为 READY
+     * 在短事务内提交衍生物生成成功结果，按 Asset -> Variant -> Job 锁序推进衍生物为 READY
+     *
+     * @param job         当前运行中的衍生物生成任务
+     * @param objectKey   衍生物产物的尝试级对象键
+     * @param contentType 实际输出 MIME 类型
+     * @param byteSize    产物字节大小
+     * @param etag        产物对象 ETag
+     * @param metadata    产物扩展元数据（图片宽高写入此 JSONB）
+     * @return 提交结果状态
      */
     public CommitOutcome completeGenerateVariantSucceeded(
             FileJob job,
@@ -266,7 +305,13 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务记录衍生物生成失败：仅推进衍生物自身状态，不影响原件资产状态
+     * 在短事务内记录衍生物生成失败结果（仅推进衍生物自身状态，不影响已就绪原件资产）
+     *
+     * @param job            当前运行中的衍生物生成任务
+     * @param failureCode    失败原因码
+     * @param failureMessage 失败补充详情
+     * @param requeue        是否重排等待重试
+     * @return 提交结果状态
      */
     public CommitOutcome recordGenerateVariantFailure(
             FileJob job,
@@ -334,7 +379,10 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务提交整份资产物理清理成功：按 Asset -> Variants -> Job 锁序写入 purged_at 并将资产推进为 DELETED
+     * 在短事务内提交整份资产物理清理成功结果，写入 purged_at 并将资产推进为 DELETED
+     *
+     * @param job 当前运行中的资产清理任务
+     * @return 提交结果状态
      */
     public CommitOutcome completeCleanupAssetSucceeded(FileJob job) {
         Objects.requireNonNull(job, "job 不能为空");
@@ -368,6 +416,7 @@ public class FileJobTxService {
                 return CommitOutcome.LEASE_LOST;
             }
 
+            // 为该资产下所有未标记 purged_at 的衍生物补齐撤回与物理清理时间戳
             for (FileVariant variant : variants) {
                 if (variant.getPurgedAt() == null) {
                     fileVariantMapper.update(null, new LambdaUpdateWrapper<FileVariant>()
@@ -391,7 +440,10 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务提交单个衍生物物理清理成功：按 Asset -> Variant -> Job 锁序写入 purged_at（保留 WITHDRAWN 状态）
+     * 在短事务内提交单个已撤回衍生物物理清理成功结果，写入 purged_at 并保持 WITHDRAWN 状态
+     *
+     * @param job 当前运行中的衍生物清理任务
+     * @return 提交结果状态
      */
     public CommitOutcome completeCleanupVariantSucceeded(FileJob job) {
         Objects.requireNonNull(job, "job 不能为空");
@@ -429,7 +481,12 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务重排失败的清理任务：同一任务按 30s/2m/15m/1h/6h... 持续自动退避，不进入终态失败
+     * 在短事务内重排失败的清理任务：同一任务持续按 30s/2min/15min/1h/6h... 退避，不进入终态失败
+     *
+     * @param job            当前运行中的清理任务
+     * @param failureCode    失败原因码
+     * @param failureMessage 最近一次失败详情
+     * @return 提交结果状态
      */
     public CommitOutcome rescheduleCleanupRetry(FileJob job, FileJobCode failureCode, String failureMessage) {
         Objects.requireNonNull(job, "job 不能为空");
@@ -456,7 +513,12 @@ public class FileJobTxService {
     }
 
     /**
-     * 短事务取消仍在运行中的任务（目标记录已撤回或删除时调用）
+     * 在短事务内将当前运行中的任务标记为 CANCELLED（目标资产或衍生物已被撤回或删除时调用）
+     *
+     * @param job         当前运行中的任务
+     * @param failureCode 可选诊断码
+     * @param reason      取消原因说明
+     * @return 提交结果状态
      */
     public CommitOutcome cancelRunningJob(FileJob job, String failureCode, String reason) {
         Objects.requireNonNull(job, "job 不能为空");
@@ -478,6 +540,22 @@ public class FileJobTxService {
         });
     }
 
+    /**
+     * 根据原件校验失败原因码决定资产终态：内容不合规归 REJECTED，缺失或故障耗尽归 FAILED
+     */
+    private FileAssetStatus resolveValidateTerminalAssetStatus(FileJobCode failureCode) {
+        if (FileJobCode.INVALID_IMAGE.equals(failureCode) || FileJobCode.IMAGE_TOO_LARGE.equals(failureCode)) {
+            return FileAssetStatus.REJECTED;
+        }
+        return FileAssetStatus.FAILED;
+    }
+
+    /**
+     * 规范化并截断失败详情文本，避免异常栈过长撑大数据库记录
+     *
+     * @param failureMessage 原始失败说明
+     * @return 规范化后的失败详情，空白时返回 {@code null}
+     */
     public static String normalizeFailureMessage(String failureMessage) {
         if (!StringUtils.hasText(failureMessage)) {
             return null;

@@ -43,6 +43,9 @@ import com.nep.tsuki.file.utils.FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 文件直传与上传确认服务，负责签发暂存区预签名 PUT 凭证、核对暂存对象元数据并登记后台校验任务
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -59,6 +62,13 @@ public class FileUploadService {
 
     /**
      * 签发文件直传预签名凭证并创建待上传文件资产记录（不记录原始文件名）
+     *
+     * @param uploaderAccountId 已鉴权的上传者账号 ID
+     * @param accountType       上传者账号端类型（用于匹配限流额度）
+     * @param kind              文件类型
+     * @param contentType       声明的文件 MIME 类型
+     * @param byteSize          声明的文件精确字节数
+     * @return 包含资产主键 ID 与预签名 PUT 凭证的结果对象
      */
     public IssuedFileUpload issueUpload(
             long uploaderAccountId,
@@ -71,6 +81,14 @@ public class FileUploadService {
 
     /**
      * 签发文件直传预签名凭证并创建待上传文件资产记录
+     *
+     * @param uploaderAccountId 已鉴权的上传者账号 ID
+     * @param accountType       上传者账号端类型（用于匹配限流额度）
+     * @param kind              文件类型
+     * @param contentType       声明的文件 MIME 类型
+     * @param byteSize          声明的文件精确字节数
+     * @param originalFilename  可选原始文件名（自动剥离路径前缀并拦截非法控制字符）
+     * @return 包含资产主键 ID 与预签名 PUT 凭证的结果对象
      */
     public IssuedFileUpload issueUpload(
             long uploaderAccountId,
@@ -92,12 +110,15 @@ public class FileUploadService {
             throw new BusinessException(ApiCode.VALIDATION_FAILED, "文件 Content-Type 不能为空");
         }
 
+        // 校验当前文件类型允许的 MIME 范围、大小上限并规范化原始文件名
         String normalizedContentType = contentType.strip().toLowerCase(Locale.ROOT);
         long maxBytes = validateUploadConstraint(kind, normalizedContentType, byteSize);
         String normalizedFilename = FileUtils.normalizeOriginalFilename(originalFilename);
 
+        // 扣减当前账号在时间窗口内的签发配额
         consumeSignQuota(uploaderAccountId, accountType);
 
+        // 生成按文件类型与 UTC 日期划分的暂存区对象键并签发预签名 PUT
         String stagingObjectKey = FileObjectPathUtils.stagingKey(kind, LocalDate.now(ZoneOffset.UTC), UUID.randomUUID());
         PresignedUpload upload = stagedUploadStorage.presignPut(
                 stagingObjectKey,
@@ -105,6 +126,7 @@ public class FileUploadService {
                 byteSize,
                 maxBytes);
 
+        // 持久化待确认状态的文件资产记录，暂存路径独立保存在 staging_key（正式 object_key 归档后写入）
         OffsetDateTime confirmExpiresAt = upload
                 .expiresAt()
                 .atOffset(ZoneOffset.UTC)
@@ -128,7 +150,11 @@ public class FileUploadService {
     }
 
     /**
-     * 校验暂存区对象元数据并确认上传完成，幂等返回当前资产状态
+     * 核对暂存区对象元数据并确认上传完成，已确认的请求幂等返回当前状态
+     *
+     * @param assetId           文件资产主键 ID
+     * @param uploaderAccountId 上传者账号 ID
+     * @return 当前文件资产状态
      */
     public FileAssetStatus confirmUpload(long assetId, long uploaderAccountId) {
         if (assetId <= 0L) {
@@ -138,6 +164,7 @@ public class FileUploadService {
             throw new IllegalArgumentException("uploaderAccountId 必须大于 0");
         }
 
+        // 查询归属当前账号的文件资产；已确认幂等返回当前状态，已过期直接返回 FILE_UPLOAD_EXPIRED
         FileAsset fileAsset = findByIdAndUploader(assetId, uploaderAccountId);
         if (fileAsset == null) {
             throw new BusinessException(FileApiCode.FILE_ASSET_NOT_FOUND);
@@ -157,7 +184,7 @@ public class FileUploadService {
             throw new IllegalStateException("文件资产状态异常, 无法执行确认: assetId=" + assetId + ", status=" + fileAsset.getStatus());
         }
 
-        // 在事务外通过 HEAD 核对暂存对象的大小、MIME 与 ETag
+        // 在事务外通过 HEAD 核对暂存对象的大小、MIME 与 ETag，避免长事务占用数据库连接
         Optional<StagedObjectMetadata> metadataOptional = stagedUploadStorage.find(fileAsset.getStagingKey());
         if (metadataOptional.isEmpty()) {
             throw new BusinessException(FileApiCode.FILE_UPLOAD_OBJECT_MISSING);
@@ -169,6 +196,7 @@ public class FileUploadService {
             throw new BusinessException(FileApiCode.FILE_UPLOAD_METADATA_MISMATCH);
         }
 
+        // 在短事务内以 PENDING_UPLOAD 与未过期为条件原子推进状态，写入暂存 ETag 并登记 VALIDATE_UPLOAD 任务
         OffsetDateTime confirmedAt = OffsetDateTime.now(ZoneOffset.UTC);
         Boolean confirmed = transactionTemplate.execute(status -> {
             int updatedRows = fileAssetMapper.update(null, new LambdaUpdateWrapper<FileAsset>()
@@ -203,6 +231,7 @@ public class FileUploadService {
             return FileAssetStatus.UPLOAD_CONFIRMED;
         }
 
+        // 并发更新未命中时回查最新状态，区分并发幂等成功、临界过期或异常状态
         FileAsset latestAsset = findByIdAndUploader(assetId, uploaderAccountId);
         if (latestAsset == null) {
             throw new BusinessException(FileApiCode.FILE_ASSET_NOT_FOUND);
@@ -217,6 +246,14 @@ public class FileUploadService {
         throw new IllegalStateException("文件资产状态异常, 无法完成确认: assetId=" + assetId + ", status=" + latestAsset.getStatus());
     }
 
+    /**
+     * 按文件类型校验允许的 MIME 类型与单文件字节大小上限
+     *
+     * @param kind                  文件类型
+     * @param normalizedContentType 规范化小写 MIME 类型
+     * @param byteSize              声明的文件字节大小
+     * @return 该文件类型允许的最大字节数上限
+     */
     private long validateUploadConstraint(FileKind kind, String normalizedContentType, long byteSize) {
         return switch (kind) {
             case IMAGE -> {
@@ -238,6 +275,12 @@ public class FileUploadService {
                 .eq(FileAsset::getUploaderAccountId, uploaderAccountId));
     }
 
+    /**
+     * 校验并扣减指定账号在当前时间窗口内的文件上传签名配额
+     *
+     * @param uploaderAccountId 上传者账号 ID
+     * @param accountType       上传者账号端类型
+     */
     private void consumeSignQuota(long uploaderAccountId, AccountType accountType) {
         String rateLimitKey = FileRedisConstants.UPLOAD_SIGN_KEY_PREFIX
                 + accountType.name().toLowerCase(Locale.ROOT) + ":"

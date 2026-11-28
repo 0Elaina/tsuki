@@ -15,9 +15,9 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 
+import com.nep.tsuki.file.model.dto.ObjectCopyResult;
 import com.nep.tsuki.file.model.enums.FileStorageScope;
 import com.nep.tsuki.file.processing.FileJobCode;
-import com.nep.tsuki.file.processing.FileProcessResult;
 import com.nep.tsuki.file.storage.FileObjectStorage;
 import com.nep.tsuki.infra.storage.s3.S3Properties;
 
@@ -131,7 +131,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
     }
 
     @Override
-    public FileProcessResult<String> copyObjectIfMatch(
+    public ObjectCopyResult copyObjectIfMatch(
             FileStorageScope sourceScope,
             String sourceKey,
             String sourceEtag,
@@ -148,6 +148,7 @@ public class S3FileObjectStorage implements FileObjectStorage {
 
         String sourceBucket = resolveBucket(sourceScope);
         String targetBucket = resolveBucket(targetScope);
+        // 复制请求仅附带源端 CopySourceIfMatch，目标键由尝试级路径保证唯一，避免目标端条件头兼容性问题
         CopyObjectRequest.Builder builder = CopyObjectRequest.builder()
                 .sourceBucket(sourceBucket)
                 .sourceKey(sourceKey)
@@ -164,13 +165,13 @@ public class S3FileObjectStorage implements FileObjectStorage {
             if (!StringUtils.hasText(targetEtag)) {
                 throw new IllegalStateException("CopyObject 响应缺少目标 ETag: targetKey=" + targetKey);
             }
-            return FileProcessResult.success(targetEtag);
+            return ObjectCopyResult.success(targetEtag);
         } catch (NoSuchKeyException ex) {
-            return FileProcessResult.failure(FileJobCode.SOURCE_MISSING);
+            return ObjectCopyResult.failure(FileJobCode.SOURCE_MISSING);
         } catch (S3Exception ex) {
             return switch (ex.statusCode()) {
-                case 404 -> FileProcessResult.failure(FileJobCode.SOURCE_MISSING);
-                case 412 -> FileProcessResult.failure(FileJobCode.SOURCE_CHANGED);
+                case 404 -> ObjectCopyResult.failure(FileJobCode.SOURCE_MISSING);
+                case 412 -> ObjectCopyResult.failure(FileJobCode.SOURCE_CHANGED);
                 default -> throw new IllegalStateException(
                         "复制归档对象失败 (HTTP " + ex.statusCode() + "): sourceKey=" + sourceKey + ", targetKey=" + targetKey,
                         ex);

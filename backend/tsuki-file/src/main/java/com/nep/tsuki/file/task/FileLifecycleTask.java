@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 文件生命周期巡检任务：负责未确认上传过期、未绑定原件到期入队清理，以及 30 天历史任务流水回收
+ * 文件生命周期定时巡检任务，负责未确认上传过期转态、未绑定原件到期入队清理及 30 天历史任务流水回收
  */
 @Slf4j
 @Component
@@ -36,7 +36,7 @@ public class FileLifecycleTask {
     private final TransactionTemplate transactionTemplate;
 
     /**
-     * 将超过确认期限的 PENDING_UPLOAD 资产置为 EXPIRED（保留元数据，暂存对象由 7 天生命周期规则清理）
+     * 巡检超过确认期限的 PENDING_UPLOAD 资产并置为 EXPIRED（保留元数据，暂存区字节由 7 天生命周期规则清理）
      */
     @Scheduled(fixedDelay = 60_000L)
     public void expirePendingUploads() {
@@ -60,7 +60,7 @@ public class FileLifecycleTask {
     }
 
     /**
-     * 将 READY 后超过 24 小时仍未绑定业务的资产置为 DELETING 并登记 CLEANUP_ASSET
+     * 巡检 READY 后超过 24 小时仍未绑定业务记录的资产：与绑定流程锁同一资产行重查，到期置为 DELETING 并登记 CLEANUP_ASSET
      */
     @Scheduled(fixedDelay = 60_000L)
     public void reclaimExpiredUnboundAssets() {
@@ -89,7 +89,7 @@ public class FileLifecycleTask {
     }
 
     /**
-     * 清理结束已满 30 天的历史任务流水（资产与衍生物保留终态记录）
+     * 每日分批清理结束已满 30 天的历史任务流水（文件资产与衍生物保留终态记录，不做物理删行）
      */
     @Scheduled(cron = PURGE_JOBS_CRON, zone = TimeConstants.ZONE_SHANGHAI)
     public void purgeFinishedJobs() {

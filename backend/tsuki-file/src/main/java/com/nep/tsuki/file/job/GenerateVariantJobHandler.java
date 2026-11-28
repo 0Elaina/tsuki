@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import org.springframework.amqp.ImmediateRequeueAmqpException;
 import org.springframework.dao.DataAccessException;
@@ -38,7 +37,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 衍生物生成任务处理器：读取已归档原件、按注册预设加工并经尝试级独占 Key 普通 PUT 落盘
+ * 衍生物生成任务处理器：下载已归档私有原件，按注册预设加工并以普通 PUT 写入尝试级独占路径
  */
 @Slf4j
 @Component
@@ -49,8 +48,8 @@ public class GenerateVariantJobHandler implements FileJobHandler {
     private final ImageProcessor imageProcessor;
 
     @Override
-    public Set<FileJobType> supportedTypes() {
-        return Set.of(FileJobType.GENERATE_VARIANT);
+    public FileJobType supportedType() {
+        return FileJobType.GENERATE_VARIANT;
     }
 
     @Override
@@ -59,6 +58,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
         FileAsset asset = claimed.asset();
         FileVariant variant = claimed.variant();
 
+        // 资产已非 READY 或衍生物已撤回/非 PENDING 时直接取消本次任务
         if (asset == null
                 || !FileAssetStatus.READY.name().equals(asset.getStatus())
                 || variant == null
@@ -81,7 +81,6 @@ public class GenerateVariantJobHandler implements FileJobHandler {
             handleFailure(job, variant, FileJobCode.UNSUPPORTED_PRESET, "不支持的文件类型: " + asset.getKind(), null);
             return;
         }
-
         if (kind != FileKind.IMAGE) {
             handleFailure(job, variant, FileJobCode.UNSUPPORTED_PRESET, "暂不支持该文件类型的衍生物生成: " + kind, null);
             return;
@@ -102,6 +101,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
         try {
             tempFile = Files.createTempFile("tsuki-file-variant-", ".tmp");
 
+            // 1. 按原件 ETag 条件下载归档原件到本地临时文件
             FileJobCode downloadCode;
             try {
                 downloadCode = fileObjectStorage.downloadToFile(
@@ -124,6 +124,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
                 return;
             }
 
+            // 2. 按注册预设执行 EXIF 校正、缩放与安全重编码
             FileProcessResult<ImageProcessingResult> processResult = imageProcessor.process(
                     tempFile,
                     asset.getContentType(),
@@ -136,6 +137,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
                 return;
             }
 
+            // 3. 在普通 PUT 前先记录尝试级独占 Key，确保异常与取消分支可幂等回收
             ImageProcessingResult output = processResult.data();
             uploadedKey = FileObjectPathUtils.variantKey(
                     asset.getId(),
@@ -157,6 +159,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
                 return;
             }
 
+            // 4. 图片宽高写入 JSONB 元数据，并在短事务内推进衍生物为 READY
             Map<String, Object> metadata = Map.of(
                     "width", output.width(),
                     "height", output.height());
@@ -203,7 +206,7 @@ public class GenerateVariantJobHandler implements FileJobHandler {
                 }
             }
         } catch (DataAccessException | TransactionException ex) {
-            // 提交结果不明时先保留产物，待租约回收确认结果后再处理
+            // 数据库提交结果不明时先保留产物，待租期回收确认结果后再处理
             log.error("提交衍生物生成结果时数据库异常，保留产物并退避 1 秒后重投: jobId={}, variantId={}, objectKey={}",
                     job.getId(), variant.getId(), objectKey, ex);
             FileJobRunner.waitBeforeImmediateRequeue();

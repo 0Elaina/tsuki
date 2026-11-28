@@ -29,6 +29,9 @@ import com.nep.tsuki.file.model.enums.FileVariantStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 文件资产业务归属与生命周期管理服务，供业务模块在同事务内完成资产绑定、更换、解绑清理及私有原件访问解析
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -45,7 +48,10 @@ public class FileAssetService {
     private final FileAccessService fileAccessService;
 
     /**
-     * 按主键查询文件资产
+     * 按主键查询文件资产记录
+     *
+     * @param assetId 文件资产主键 ID
+     * @return 文件资产实体
      */
     public FileAsset getAsset(long assetId) {
         validatePositive(assetId, "assetId");
@@ -57,12 +63,17 @@ public class FileAssetService {
     }
 
     /**
-     * 未绑定时供上传者预览私有原件（签发 5 分钟 GET 预签名地址）
+     * 未绑定业务记录时供上传者预览私有原件（签发 5 分钟 GET 预签名地址）
+     *
+     * @param assetId           文件资产主键 ID
+     * @param uploaderAccountId 上传者账号 ID
+     * @return 临时私有预签名访问地址
      */
     public URI resolvePreviewUrl(long assetId, long uploaderAccountId) {
         validatePositive(assetId, "assetId");
         validatePositive(uploaderAccountId, "uploaderAccountId");
 
+        // 仅允许上传者本人预览已就绪、未绑定且未超过 24 小时宽限期的原件
         FileAsset asset = fileAssetMapper.selectOne(new LambdaQueryWrapper<FileAsset>()
                 .eq(FileAsset::getId, assetId)
                 .eq(FileAsset::getUploaderAccountId, uploaderAccountId));
@@ -83,7 +94,10 @@ public class FileAssetService {
     }
 
     /**
-     * 业务完成鉴权后解析已就绪原件的私有访问地址（5 分钟 GET 预签名地址）
+     * 业务模块完成鉴权后解析已就绪原件的私有访问地址（5 分钟 GET 预签名地址）
+     *
+     * @param assetId 文件资产主键 ID
+     * @return 临时私有预签名访问地址
      */
     public URI resolveOriginalUrl(long assetId) {
         FileAsset asset = getAsset(assetId);
@@ -94,7 +108,13 @@ public class FileAssetService {
     }
 
     /**
-     * 将已就绪的文件资产绑定到指定业务记录（强校验上传者账号，同事务提交，同一记录重复绑定幂等）
+     * 将已就绪的文件资产绑定到指定业务记录（强校验上传者账号，同记录重复绑定幂等，跨记录冲突）
+     *
+     * @param assetId                   文件资产主键 ID
+     * @param ownerType                 业务归属类型标识（非空，最长 64 字符）
+     * @param ownerId                   业务记录主键 ID
+     * @param expectedUploaderAccountId 期望的上传者账号 ID（防越权绑定他人资产）
+     * @return 绑定完成后的文件资产实体
      */
     @Transactional
     public FileAsset bindAsset(long assetId, String ownerType, long ownerId, long expectedUploaderAccountId) {
@@ -103,7 +123,12 @@ public class FileAssetService {
     }
 
     /**
-     * 将已就绪的文件资产绑定到指定业务记录（不限制上传者，适用于管理端或内部系统流程）
+     * 将已就绪的文件资产绑定到指定业务记录（不限制上传者账号，适用于管理端或内部系统流程）
+     *
+     * @param assetId   文件资产主键 ID
+     * @param ownerType 业务归属类型标识
+     * @param ownerId   业务记录主键 ID
+     * @return 绑定完成后的文件资产实体
      */
     @Transactional
     public FileAsset bindAsset(long assetId, String ownerType, long ownerId) {
@@ -112,6 +137,13 @@ public class FileAssetService {
 
     /**
      * 业务更换文件：同事务绑定新资产（强校验上传者），并撤回旧资产衍生物与登记旧资产清理
+     *
+     * @param oldAssetId                原绑定的旧资产 ID（可为 null，为 null 或与新资产相同时退化为普通绑定）
+     * @param newAssetId                待绑定的新资产 ID
+     * @param ownerType                 业务归属类型标识
+     * @param ownerId                   业务记录主键 ID
+     * @param expectedUploaderAccountId 期望的新资产上传者账号 ID
+     * @return 绑定完成后的新文件资产实体
      */
     @Transactional
     public FileAsset replaceOwnerAsset(
@@ -126,7 +158,13 @@ public class FileAssetService {
     }
 
     /**
-     * 业务更换文件（不限制新资产上传者）
+     * 业务更换文件（不限制新资产上传者账号）
+     *
+     * @param oldAssetId 原绑定的旧资产 ID（可为 null）
+     * @param newAssetId 待绑定的新资产 ID
+     * @param ownerType  业务归属类型标识
+     * @param ownerId    业务记录主键 ID
+     * @return 绑定完成后的新文件资产实体
      */
     @Transactional
     public FileAsset replaceOwnerAsset(Long oldAssetId, long newAssetId, String ownerType, long ownerId) {
@@ -134,7 +172,11 @@ public class FileAssetService {
     }
 
     /**
-     * 业务解绑并删除指定归属的文件资产：同事务停发、撤回衍生物、取消待执行任务并登记 CLEANUP_ASSET
+     * 业务解绑并删除指定归属的文件资产：同事务停发、撤回全部衍生物、取消待执行任务并登记 CLEANUP_ASSET
+     *
+     * @param assetId   文件资产主键 ID
+     * @param ownerType 业务归属类型标识
+     * @param ownerId   业务记录主键 ID
      */
     @Transactional
     public void deleteAsset(long assetId, String ownerType, long ownerId) {
@@ -157,7 +199,9 @@ public class FileAssetService {
     }
 
     /**
-     * 管理或系统流程直接标记资产删除并登记清理任务
+     * 管理或系统流程直接标记资产删除并登记清理任务（幂等）
+     *
+     * @param assetId 文件资产主键 ID
      */
     @Transactional
     public void deleteAsset(long assetId) {
@@ -170,7 +214,10 @@ public class FileAssetService {
     }
 
     /**
-     * 巡检回收单个到期且未绑定的 READY 资产：与绑定锁同一资产行并重查状态，同事务置为 DELETING 并登记 CLEANUP_ASSET
+     * 巡检回收单个到期且未绑定的 READY 资产：与绑定流程锁同一资产行并重查状态，同事务置为 DELETING 并登记 CLEANUP_ASSET
+     *
+     * @param assetId 候选过期未绑定资产主键 ID
+     * @return 实际进入清理队列返回 {@code true}；已被并发绑定或状态已变化返回 {@code false}
      */
     @Transactional
     public boolean reclaimExpiredUnboundAsset(long assetId) {
@@ -216,7 +263,7 @@ public class FileAssetService {
         }
         validatePositive(oldAssetId, "oldAssetId");
 
-        // 按主键升序锁定两个资产行，避免并发互换产生死锁
+        // 按主键升序锁定两个资产行，防止并发交叉替换产生死锁
         long firstId = Math.min(oldAssetId, newAssetId);
         long secondId = Math.max(oldAssetId, newAssetId);
         FileAsset first = fileAssetMapper.selectByIdForUpdate(firstId);
@@ -229,6 +276,7 @@ public class FileAssetService {
         FileAsset boundNewAsset = bindLockedAsset(newAsset, normalizedOwnerType, ownerId,
                 expectedUploaderAccountId, now);
 
+        // 旧资产属于当前业务记录且尚未进入清理流程时，同事务登记清理
         if (oldAsset != null
                 && !FileAssetStatus.DELETING.name().equals(oldAsset.getStatus())
                 && !FileAssetStatus.DELETED.name().equals(oldAsset.getStatus())) {
@@ -258,6 +306,7 @@ public class FileAssetService {
             throw new BusinessException(FileApiCode.FILE_ASSET_NOT_READY);
         }
 
+        // 已绑定场景：同一业务记录重复绑定直接幂等返回，其他业务记录拒绝并报冲突
         if (asset.getOwnerType() != null) {
             if (ownerType.equals(asset.getOwnerType()) && Long.valueOf(ownerId).equals(asset.getOwnerId())) {
                 return asset;
@@ -265,6 +314,7 @@ public class FileAssetService {
             throw new BusinessException(FileApiCode.FILE_ASSET_OWNER_CONFLICT);
         }
 
+        // 未绑定场景：核对上传者归属与 24h 未绑定宽限期，通过后成对写入归属并清空过期期限
         if (expectedUploaderAccountId != null && !expectedUploaderAccountId.equals(asset.getUploaderAccountId())) {
             throw new BusinessException(ApiCode.ACCESS_DENIED, "无权绑定他人上传的文件资产");
         }
@@ -300,7 +350,7 @@ public class FileAssetService {
             return;
         }
 
-        // 遵循 Asset -> Variant -> Job 锁序：先按主键升序锁定并撤回该资产下所有未撤回衍生物
+        // 遵循 Asset -> Variant -> Job 锁序：先按主键升序锁定并撤回该资产下全部未撤回衍生物
         List<FileVariant> variants = fileVariantMapper.selectByAssetIdForUpdate(asset.getId());
         for (FileVariant variant : variants) {
             if (!FileVariantStatus.WITHDRAWN.name().equals(variant.getStatus())) {
@@ -313,7 +363,7 @@ public class FileAssetService {
             }
         }
 
-        // 取消该资产下所有尚未领取的校验、生成与单衍生物清理任务（RUNNING 任务保留租约等待自行收敛为 CANCELLED）
+        // 取消尚未领取的校验、生成与单衍生物清理任务；RUNNING 任务保留租约等待提交或 Reaper 收敛为 CANCELLED
         fileJobMapper.cancelPendingByAsset(asset.getId(), CANCELLABLE_TYPES_ON_ASSET_DELETE, now);
 
         fileAssetMapper.update(null, new LambdaUpdateWrapper<FileAsset>()
